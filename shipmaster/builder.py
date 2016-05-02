@@ -32,7 +32,7 @@ class BaseBuilder:
 
     @property
     def script(self):
-        with DockerFile(self.layer_conf.base.from_image) as df:
+        with DockerFile(self.layer_conf.from_image) as df:
             self._add_commands(df)
             df.finalize()
             return df.getvalue().decode()
