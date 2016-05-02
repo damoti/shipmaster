@@ -1,0 +1,13 @@
+{% extends "shipmaster/base.html" %}
+{% load i18n %}
+
+{% block content %}
+  <div>{{ current_repo.git }}</div>
+  <div style="overflow-x: scroll; white-space: nowrap;">{{ current_repo.public_key }}</div>
+  <a href="{% url "repository.pull" current_repo.name %}">{% trans "Pull" %}</a>
+  <ul>
+  {% for build in current_repo.builds %}
+  <li><a href="{% url "build.view" current_repo.name build.number %}">{{ build.number }}</a></li>
+  {% endfor %}
+  </ul>
+{% endblock %}

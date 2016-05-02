@@ -1,0 +1,11 @@
+{% extends "shipmaster/base.html" %}
+{% load i18n %}
+
+{% block content %}
+  <a href="{% url "job.start" current_repo.name current_build.number %}">{% trans "Start Job" %}</a>
+  <ul>
+    {% for job in current_build.jobs %}
+      <li><a href="{% url "job.view" current_repo.name current_build.number job.number %}">{{ job.number }}</a></li>
+    {% endfor %}
+  </ul>
+{% endblock %}

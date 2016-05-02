@@ -1,0 +1,11 @@
+version: '2'
+services:
+  app:
+    build: .
+    image: damoti/shipmaster
+    volumes:
+      - .:/usr/lib/shipmaster
+      - /var/lib/shipmaster:/var/lib/shipmaster
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8000:8000"
