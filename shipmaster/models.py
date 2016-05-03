@@ -7,6 +7,7 @@ from .config import ShipmasterConf
 from . import services
 from docker import Client
 from compose.cli.main import filter_containers_to_service_names
+from compose.container import Container
 from compose.cli.log_printer import LogPrinter, build_log_presenters
 from ruamel import yaml
 
@@ -283,8 +284,8 @@ class JobPath:
         return os.path.join(self.absolute, 'build.log')
 
     @property
-    def cid(self):
-        return os.path.join(self.absolute, 'cid')
+    def containers(self):
+        return os.path.join(self.absolute, 'containers')
 
     @property
     def pull(self):
@@ -306,8 +307,9 @@ class Job:
         self.dict = OrderedDict()
 
     @property
-    def cid(self):
-        return open(self.path.cid, 'r').read().strip()
+    def containers(self):
+        with open(self.path.containers, 'r') as cid:
+            return yaml.load(cid)
 
     @classmethod
     def load(cls, build, number):
@@ -338,16 +340,15 @@ class Job:
         conf.services.environment['GIT_SSH_COMMAND'] = "ssh -F {}".format(self.shipmaster.path.ssh_config)
         conf.services.volumes += ['{0}:{0}'.format(self.shipmaster.path.ssh_dir)]
         containers = services.up(conf, client, log=False)
-        with open(self.path.cid, 'w') as cid:
-            yaml.dump(containers, cid)
+        with open(self.path.containers, 'w') as cf:
+            yaml.dump([c.id for c in containers], cf)
 
     def log(self):
-        with open(self.path.cid, 'r') as cid:
-            containers = yaml.load(cid)
         client = Client('unix://var/run/docker.sock')
         shipmaster_yaml = os.path.join(self.path.workspace, '.shipmaster.yaml')
         conf = ShipmasterConf.from_filename('test', shipmaster_yaml)
         project = services.get_project(conf, client)
+        containers = [Container.from_id(client, cid) for cid in self.containers]
         return services.LogPrinter(
             filter_containers_to_service_names(containers, ['app']),
             build_log_presenters(['app'], False),

@@ -93,6 +93,8 @@ class ServicesConf:
             'working_dir': '/app',
             'command': conf.active_layer.command
         })
+        if conf.active_layer.name == 'test':
+            services['app'].pop('ports', None)
         self.volumes = services['app'].setdefault('volumes', [])
         self.volumes += conf.volumes
         self.environment = services['app'].setdefault('environment', {})
