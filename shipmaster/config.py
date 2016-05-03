@@ -7,9 +7,10 @@ class ShipmasterConf:
 
     TEMP_PATH = '/tmp/shipmaster'
 
-    def __init__(self, filename, conf):
+    def __init__(self, active_layer, filename, conf):
         self.filename = filename
         self.name = conf['name']
+        self.workspace = os.path.dirname(filename)
 
         self.scripts_dir = os.path.join(self.TEMP_PATH, 'scripts')
         self.script_name = 'build.sh'
@@ -20,7 +21,7 @@ class ShipmasterConf:
         self.image_ssh_auth_dir = os.path.join(self.TEMP_PATH, 'ssh-auth')
 
         self.volumes = [
-            os.getcwd()+':/app',
+            self.workspace+':/app',
             '{0}:{0}'.format(self.scripts_dir),
             '{}:{}'.format(self.local_ssh_auth_dir,
                            self.image_ssh_auth_dir)
@@ -47,13 +48,14 @@ class ShipmasterConf:
                     layer['from'] = self.name+'/base:latest'
             setattr(self, layer_name, LayerConf(self, layer))
 
+        self.active_layer = getattr(self, active_layer)
         self.ssh = SSHConf(self, conf.get('ssh', {}))
         self.services = ServicesConf(self, conf.get('services', {}))
 
     @classmethod
-    def from_filename(cls, filename):
+    def from_filename(cls, active_layer, filename):
         with open(filename, 'r') as file:
-            return cls(filename, yaml.load(file))
+            return cls(active_layer, filename, yaml.load(file))
 
 
 class LayerConf:
@@ -64,6 +66,7 @@ class LayerConf:
         self.tag = layer['tag']
         self.image_name = self.repository+':'+self.tag
         self.from_image = layer['from']
+        self.command = layer.get('command')
         self.apt_get = layer.get('apt-get', [])
         self.context = layer.get('context', [])
         self.script = layer.get('script', [])
@@ -83,23 +86,29 @@ class ServicesConf:
 
     def __init__(self, conf, services):
         self.conf = conf
-        self.names = list(services.keys())
+        self.services = services
 
         services['app'].update({
-            'image': conf.name+'/dev',
+            'image': conf.active_layer.repository,
             'working_dir': '/app',
+            'command': conf.active_layer.command
         })
-        volumes = services['app'].setdefault('volumes', [])
-        volumes += conf.volumes
+        self.volumes = services['app'].setdefault('volumes', [])
+        self.volumes += conf.volumes
+        self.environment = services['app'].setdefault('environment', {})
+        self.environment.update(conf.environment)
 
+    @property
+    def names(self):
+        return list(self.services.keys())
+
+    @property
+    def compose(self):
         config_file = compose_config.ConfigFile('.shipmaster.yaml', {
             'version': '2',
-            'services': services
+            'services': self.services
         })
-
         env = compose_config.Environment()
-        env.update(os.environ)
-
+        env.update(os.environ.copy())
         config_details = compose_config.ConfigDetails(os.getcwd(), [config_file], env)
-
-        self.compose = compose_config.load(config_details)
+        return compose_config.load(config_details)

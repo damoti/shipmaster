@@ -1,4 +1,4 @@
-FROM damoti/base
+FROM damoti/base:latest
 
 RUN mkdir -p /root/.ssh && \
     ssh-keyscan github.com >> /root/.ssh/known_hosts && \

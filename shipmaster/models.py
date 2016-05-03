@@ -1,9 +1,13 @@
 import os
 import re
-import shlex
 import shutil
 import subprocess
 from collections import OrderedDict
+from .config import ShipmasterConf
+from . import services
+from docker import Client
+from compose.cli.main import filter_containers_to_service_names
+from compose.cli.log_printer import LogPrinter, build_log_presenters
 from ruamel import yaml
 
 
@@ -26,7 +30,7 @@ class ShipmasterPath:
 
     @property
     def ssh_config(self):
-        return os.path.join(self.ssh_dir, 'config')
+        return os.path.join(self.ssh_dir, 'ssh_config')
 
 
 class Shipmaster:
@@ -34,9 +38,11 @@ class Shipmaster:
     def __init__(self, data_path):
         self.path = ShipmasterPath(data_path)
 
-    def run(self, command):
-        full_command = "GIT_SSH_COMMAND='ssh -F {}' {}".format(self.path.ssh_config, command)
-        subprocess.check_output(full_command, shell=True, stderr=subprocess.STDOUT)
+    def run(self, command, cwd=None):
+        env = {**os.environ, "GIT_SSH_COMMAND": "ssh -F {}".format(self.path.ssh_config)}
+        out = subprocess.check_output(command, shell=True, cwd=cwd, env=env, stderr=subprocess.STDOUT)
+        print(out)
+        return out
 
     def update_ssh_config(self):
         with open(self.path.ssh_config, 'w') as config:
@@ -202,6 +208,10 @@ class BuildPath:
         return os.path.join(self.absolute, 'pull')
 
     @property
+    def conf(self):
+        return os.path.join(self.pull, '.shipmaster.yaml')
+
+    @property
     def jobs(self):
         return os.path.join(self.absolute, 'jobs')
 
@@ -243,7 +253,7 @@ class Build:
             yield Job.load(self, job.split('/')[-1])
 
     def pull(self):
-        self.shipmaster.run("git clone --depth=1 {} {}".format(self.repo.modified_git, self.path.pull))
+        self.shipmaster.run("git clone --depth=1 --branch=docker {0} {1}".format(self.repo.modified_git, self.path.pull))
 
     @classmethod
     def create(cls, repo, branch):
@@ -322,24 +332,27 @@ class Job:
         return job
 
     def start(self):
-        subprocess.Popen([
-            "docker", "run",
-            "--cidfile", self.path.cid,
-            "--workdir", "/workspace",
-            "-v", self.path.workspace+":/workspace",
-            "-v", self.shipmaster.path.ssh_dir+":"+self.shipmaster.path.ssh_dir,
-            "-e", "GIT_SSH_COMMAND=ssh -F "+self.shipmaster.path.ssh_config,
-
-            "{}/test:latest".format(self.repo.name),
-            "pip3", "install", "django"
-        ])
+        client = Client('unix://var/run/docker.sock')
+        shipmaster_yaml = os.path.join(self.path.workspace, '.shipmaster.yaml')
+        conf = ShipmasterConf.from_filename('test', shipmaster_yaml)
+        conf.services.environment['GIT_SSH_COMMAND'] = "ssh -F {}".format(self.shipmaster.path.ssh_config)
+        conf.services.volumes += ['{0}:{0}'.format(self.shipmaster.path.ssh_dir)]
+        containers = services.up(conf, client, log=False)
+        with open(self.path.cid, 'w') as cid:
+            yaml.dump(containers, cid)
 
     def log(self):
-        command = shlex.split("docker logs --tail=all -f {}".format(self.cid))
-        process = subprocess.Popen(command, stdout=subprocess.PIPE)
-        for line in iter(process.stdout.readline, b''):
-            yield line
-        yield 'Build Finished'
+        with open(self.path.cid, 'r') as cid:
+            containers = yaml.load(cid)
+        client = Client('unix://var/run/docker.sock')
+        shipmaster_yaml = os.path.join(self.path.workspace, '.shipmaster.yaml')
+        conf = ShipmasterConf.from_filename('test', shipmaster_yaml)
+        project = services.get_project(conf, client)
+        return services.LogPrinter(
+            filter_containers_to_service_names(containers, ['app']),
+            build_log_presenters(['app'], False),
+            project.events(service_names=['app']),
+            cascade_stop=True).run()
 
 
 def increment_number_file(path):

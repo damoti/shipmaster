@@ -31,18 +31,23 @@ def build_image_if_not_exists(args, layer, conf, client):
     layer_conf = getattr(conf, layer)
     image_details = client.images(layer_conf.image_name)
     if (args.layer == layer and args.rebuild) or not image_details:
-        print("Building {}: {}".format(layer.capitalize(), layer_conf.image_name))
-        builder = LayerBuilder(args.layer, conf, args.debug_ssh_agent)
-        builder.build(client)
+        build_image(args, layer, conf, client)
         image_details = client.images(layer_conf.image_name)
     print_image_info(layer.capitalize(), image_details[0])
+
+
+def build_image(args, layer, conf, client):
+    layer_conf = getattr(conf, layer)
+    print("Building {}: {}".format(layer.capitalize(), layer_conf.image_name))
+    builder = LayerBuilder(args.layer, conf, args.debug_ssh_agent)
+    builder.build(client)
 
 
 def main():
 
     args = parse_arguments()
     client = Client('unix://var/run/docker.sock')
-    conf = ShipmasterConf.from_filename(os.path.join(os.getcwd(), '.shipmaster.yaml'))
+    conf = ShipmasterConf.from_filename(args.layer, os.path.join(os.getcwd(), '.shipmaster.yaml'))
 
     if args.script:
         builder = LayerBuilder(args.layer, conf, args.debug_ssh_agent)
@@ -51,6 +56,11 @@ def main():
 
     build_image_if_not_exists(args, 'base', conf, client)
 
-    if args.layer != 'base':
+    if args.layer in ('app', 'dev'):
         build_image_if_not_exists(args, args.layer, conf, client)
+        services.up(conf, client)
+
+    elif args.layer == 'test':
+        build_image_if_not_exists(args, 'app', conf, client)
+        build_image(args, 'test', conf, client)
         services.up(conf, client)
