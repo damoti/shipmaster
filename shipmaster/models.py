@@ -2,14 +2,17 @@ import os
 import re
 import shutil
 import subprocess
+from random import randint
 from collections import OrderedDict
-from .config import ShipmasterConf
-from . import services
 from docker import Client
 from compose.cli.main import filter_containers_to_service_names
 from compose.container import Container
 from compose.cli.log_printer import LogPrinter, build_log_presenters
 from ruamel import yaml
+
+from .config import ShipmasterConf
+from .routing import build_app, deploy_app
+from . import services
 
 
 class ShipmasterPath:
@@ -38,12 +41,6 @@ class Shipmaster:
 
     def __init__(self, data_path):
         self.path = ShipmasterPath(data_path)
-
-    def run(self, command, cwd=None):
-        env = {**os.environ, "GIT_SSH_COMMAND": "ssh -F {}".format(self.path.ssh_config)}
-        out = subprocess.check_output(command, shell=True, cwd=cwd, env=env, stderr=subprocess.STDOUT)
-        print(out)
-        return out
 
     def update_ssh_config(self):
         with open(self.path.ssh_config, 'w') as config:
@@ -123,7 +120,7 @@ class Repository:
         return self.dict['name']
 
     @property
-    def git_modified_host(self):
+    def git_project_host(self):
         return "{}.{}".format(self.name, self.git_host)
 
     @property
@@ -135,14 +132,20 @@ class Repository:
         self.dict['git'] = git
 
     @property
-    def modified_git(self):
-        return "git@{}:{}/{}.git".format(self.git_modified_host, self.git_account, self.git_repo)
+    def project_git(self):
+        return "git@{}:{}/{}.git".format(self.git_project_host, self.git_account, self.git_repo)
 
     @classmethod
     def load(cls, shipmaster, name):
         repo = cls(shipmaster, name)
         repo._load()
         return repo
+
+    @classmethod
+    def from_path(cls, path):
+        shipmaster_path = os.path.dirname(os.path.dirname(path))
+        shipmaster = Shipmaster(shipmaster_path)
+        return Repository.load(shipmaster, os.path.basename(path))
 
     def _load(self):
         with open(self.path.yaml, 'r') as file:
@@ -202,15 +205,19 @@ class BuildPath:
 
     @property
     def yaml(self):
-        return os.path.join(self.absolute, 'info.yaml')
+        return os.path.join(self.absolute, 'build.yaml')
 
     @property
-    def pull(self):
-        return os.path.join(self.absolute, 'pull')
+    def log(self):
+        return os.path.join(self.absolute, 'build.log')
+
+    @property
+    def workspace(self):
+        return os.path.join(self.absolute, 'workspace')
 
     @property
     def conf(self):
-        return os.path.join(self.pull, '.shipmaster.yaml')
+        return os.path.join(self.workspace, '.shipmaster.yaml')
 
     @property
     def jobs(self):
@@ -237,9 +244,15 @@ class Build:
 
     @classmethod
     def load(cls, repo, number):
-        repo = cls(repo, number)
-        repo._load()
-        return repo
+        build = cls(repo, number)
+        build._load()
+        return build
+
+    @classmethod
+    def from_path(cls, path):
+        repo_path = os.path.dirname(os.path.dirname(path))
+        repo = Repository.from_path(repo_path)
+        return Build.load(repo, os.path.basename(path))
 
     def _load(self):
         with open(self.path.yaml, 'r') as file:
@@ -251,10 +264,7 @@ class Build:
 
     def jobs(self):
         for job in os.listdir(self.path.jobs):
-            yield Job.load(self, job.split('/')[-1])
-
-    def pull(self):
-        self.shipmaster.run("git clone --depth=1 --branch=docker {0} {1}".format(self.repo.modified_git, self.path.pull))
+            yield Job.load(self, os.path.basename(job))
 
     @classmethod
     def create(cls, repo, branch):
@@ -262,7 +272,14 @@ class Build:
         os.mkdir(build.path.absolute)
         os.mkdir(build.path.jobs)
         build.save()
+        build.build()
         return build
+
+    def build(self):
+        build_app.send({'path': self.path.absolute})
+
+    def deploy(self):
+        deploy_app.send({'path': self.path.absolute})
 
 
 class JobPath:
@@ -277,23 +294,11 @@ class JobPath:
 
     @property
     def yaml(self):
-        return os.path.join(self.absolute, 'info.yaml')
+        return os.path.join(self.absolute, 'job.yaml')
 
     @property
     def log(self):
-        return os.path.join(self.absolute, 'build.log')
-
-    @property
-    def containers(self):
-        return os.path.join(self.absolute, 'containers')
-
-    @property
-    def pull(self):
-        return self.build.path.pull
-
-    @property
-    def workspace(self):
-        return os.path.join(self.absolute, 'workspace')
+        return os.path.join(self.absolute, 'job.log')
 
 
 class Job:
@@ -306,16 +311,17 @@ class Job:
         self.path = JobPath(self.build, self.number)
         self.dict = OrderedDict()
 
-    @property
-    def containers(self):
-        with open(self.path.containers, 'r') as cid:
-            return yaml.load(cid)
-
     @classmethod
     def load(cls, build, number):
-        repo = cls(build, number)
-        repo._load()
-        return repo
+        job = cls(build, number)
+        job._load()
+        return job
+
+    @classmethod
+    def from_path(cls, path):
+        build_path = os.path.dirname(os.path.dirname(path))
+        build = Build.from_path(build_path)
+        return Job.load(build, os.path.basename(path))
 
     def _load(self):
         with open(self.path.yaml, 'r') as file:
@@ -329,9 +335,13 @@ class Job:
     def create(cls, build):
         job = cls(build, build.increment_job_number())
         os.mkdir(job.path.absolute)
-        shutil.copytree(job.path.pull, job.path.workspace)
         job.save()
         return job
+
+    def build(self):
+        job_channel.send({
+            'path': build.path.absolute
+        })
 
     def start(self):
         client = Client('unix://var/run/docker.sock')
@@ -340,8 +350,15 @@ class Job:
         conf.services.environment['GIT_SSH_COMMAND'] = "ssh -F {}".format(self.shipmaster.path.ssh_config)
         conf.services.volumes += ['{0}:{0}'.format(self.shipmaster.path.ssh_dir)]
         containers = services.up(conf, client, log=False)
+        cdict = {}
+        for c in containers:
+            cdict[c.service] = {
+                'containerId': c.id,
+                'imageId': c.image,
+                'repo': c.image_config['RepoTags'][0]
+            }
         with open(self.path.containers, 'w') as cf:
-            yaml.dump([c.id for c in containers], cf)
+            yaml.dump(cdict, cf)
 
     def log(self):
         client = Client('unix://var/run/docker.sock')
@@ -354,6 +371,16 @@ class Job:
             build_log_presenters(['app'], False),
             project.events(service_names=['app']),
             cascade_stop=True).run()
+
+    def deploy(self):
+        client = Client('unix://var/run/docker.sock')
+        shipmaster_yaml = os.path.join(self.path.workspace, '.shipmaster.yaml')
+        conf = ShipmasterConf.from_filename('app', shipmaster_yaml)
+        with open(self.path.containers, 'r') as cf:
+            containers = yaml.load(cf)
+        conf.services.services['app']['image'] = containers['app']['imageId']
+        conf.services.services['app']['ports'] = []  # '{0}:{0}'.format(randint(2000, 8000))]
+        services.up(conf, client, log=False)
 
 
 def increment_number_file(path):

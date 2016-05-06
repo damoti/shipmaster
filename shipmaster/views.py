@@ -5,6 +5,8 @@ from django.http import StreamingHttpResponse
 from django.views.generic import View, TemplateView, FormView
 from django.core.urlresolvers import reverse
 
+from docker import Client
+
 from .models import Repository, Build, Job
 from .forms import RepositoryForm
 
@@ -14,6 +16,8 @@ class Dashboard(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data()
+        client = Client('unix://var/run/docker.sock')
+        context['containers'] = client.containers()
         return context
 
 
@@ -103,6 +107,20 @@ class ViewJobOutput(View):
             return response
         except CalledProcessError as err:
             return HttpResponse(err.output)
+
+
+class DeployJob(View):
+
+    def get(self, request, *args, **kwargs):
+        repo = request.current_repo
+        build = request.current_build
+        job = request.current_job
+        try:
+            job.deploy()
+        except CalledProcessError as err:
+            return HttpResponse(err.output)
+        else:
+            return HttpResponseRedirect(reverse('job.view', args=[repo.name, build.number, job.number]))
 
 
 class ViewSettings(TemplateView):

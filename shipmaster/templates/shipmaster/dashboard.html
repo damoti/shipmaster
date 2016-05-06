@@ -1,4 +1,11 @@
 {% extends "shipmaster/base.html" %}
 
 {% block content %}
+  <ul>
+    {% for container in containers %}
+      <li>
+      {{ container }}
+      </li>
+    {% endfor %}
+  </ul>
 {% endblock %}

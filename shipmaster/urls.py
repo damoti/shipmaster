@@ -14,6 +14,7 @@ urlpatterns = [
     url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/$", views.ViewBuild.as_view(), name="build.view"),
     url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/start$", views.StartJob.as_view(), name="job.start"),
     url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/job/(?P<job>\d+)/$", views.ViewJob.as_view(), name="job.view"),
+    url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/job/(?P<job>\d+)/deploy$", views.DeployJob.as_view(), name="job.deploy"),
     url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/job/(?P<job>\d+)/output$", views.ViewJobOutput.as_view(), name="job.output"),
 
 ]
