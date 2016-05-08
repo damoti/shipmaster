@@ -8,7 +8,7 @@ SHIPMASTER_DATA = '/var/lib/shipmaster'
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "asgiref.inmemory.ChannelLayer",
-        "ROUTING": "shipmaster.routing.channel_routing",
+        "ROUTING": "shipmaster.server.routing.channel_routing",
     },
 }
 
@@ -35,7 +35,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'bootstrapform',
     'channels',
-    'shipmaster'
+    'shipmaster.server'
 ]
 
 MIDDLEWARE_CLASSES = [
@@ -47,10 +47,10 @@ MIDDLEWARE_CLASSES = [
     'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'shipmaster.middleware.ShipmasterMiddleware'
+    'shipmaster.server.middleware.ShipmasterMiddleware'
 ]
 
-ROOT_URLCONF = 'shipmaster.urls'
+ROOT_URLCONF = 'shipmaster.server.urls'
 
 TEMPLATES = [
     {
@@ -68,7 +68,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'shipmaster.wsgi.application'
+WSGI_APPLICATION = 'shipmaster.server.wsgi.application'
 
 
 # Database

@@ -12,6 +12,7 @@ urlpatterns = [
     url(r"^repository/(?P<repo>[\w\.\-]+)/$", views.ViewRepository.as_view(), name="repository"),
     url(r"^repository/(?P<repo>[\w\.\-]+)/pull$", csrf_exempt(views.PullRequest.as_view()), name="repository.pull"),
     url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/$", views.ViewBuild.as_view(), name="build.view"),
+    url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/output$", views.ViewBuildOutput.as_view(), name="build.output"),
     url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/start$", views.StartJob.as_view(), name="job.start"),
     url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/job/(?P<job>\d+)/$", views.ViewJob.as_view(), name="job.view"),
     url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/job/(?P<job>\d+)/deploy$", views.DeployJob.as_view(), name="job.deploy"),

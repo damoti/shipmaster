@@ -2,6 +2,7 @@
 {% load i18n %}
 
 {% block content %}
+  <iframe src="{% url "build.output" current_repo.name current_build.number %}" height="250" width="100%"></iframe>
   <a href="{% url "job.start" current_repo.name current_build.number %}">{% trans "Start Job" %}</a>
   <ul>
     {% for job in current_build.jobs %}
