@@ -97,7 +97,7 @@ class StartJob(View):
         build = request.current_build
         try:
             job = Job.create(build)
-            job.start()
+            job.test()
         except CalledProcessError as err:
             return HttpResponse(err.output)
         else:
@@ -116,8 +116,10 @@ class ViewJob(TemplateView):
 class ViewJobOutput(View):
 
     def get(self, request, *args, **kwargs):
+        job = request.current_job
         try:
-            response = StreamingHttpResponse(request.current_job.log(), content_type="text/event-stream")
+            response = FileResponse(open(job.path.log, 'r'), content_type="text/event-stream")
+            response.block_size = 128
             response['Cache-Control'] = 'no-cache'
             response['X-Accel-Buffering'] = 'no'
             return response

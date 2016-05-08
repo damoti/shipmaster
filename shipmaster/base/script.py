@@ -3,6 +3,7 @@ import io
 from fnmatch import fnmatch
 from tarfile import TarFile, TarInfo
 from tempfile import NamedTemporaryFile
+from humanfriendly import format_size
 
 SCRIPT_PATH = '/shipmaster/scripts/'
 APP_PATH = '/app'
@@ -94,17 +95,21 @@ class Script:
 
 class Archive:
 
-    def __init__(self, workspace, exclude=None):
+    def __init__(self, workspace, log):
         self.workspace = workspace
+        self.log = log
         self.base = os.path.abspath(os.path.dirname(__file__))
         self.archive_file = NamedTemporaryFile('wb+')
         self.archive = TarFile.open(mode='w', fileobj=self.archive_file)
         self._closed = False
 
-        self.exclude = exclude or []
-        exclude_patterns = os.path.join(self.workspace, '.dockerignore')
+        self.exclude = []
+        exclude_patterns = os.path.join(workspace, '.dockerignore')
         if os.path.exists(exclude_patterns):
-            self._setup_excludes(exclude_patterns)
+            with open(exclude_patterns, 'r') as patterns:
+                for pattern in patterns.readlines():
+                    if pattern:
+                        self.exclude.append(pattern.strip())
 
     def add_script(self, script: Script):
         assert not self._closed
@@ -117,18 +122,13 @@ class Archive:
         self.archive.add(input_path, output_path)
 
     def _filter_git(self, info):
-        relative = os.path.relpath(info.name, APP_PATH)
+        abspath = os.path.join('/', info.name)
+        relative = os.path.relpath(abspath, APP_PATH)
         for pattern in self.exclude:
             if fnmatch(relative, pattern):
                 print('excluding '+relative)
                 return None
         return info
-
-    def _setup_excludes(self, path):
-        with open(path, 'r') as patterns:
-            for pattern in patterns.readlines():
-                if pattern:
-                    self.exclude.append(pattern)
 
     def add_project_file(self, path):
         assert not self._closed
@@ -141,6 +141,8 @@ class Archive:
         self.archive.close()
         self.archive_file.seek(0)
         self._closed = True
+        size = os.path.getsize(self.archive_file.name)
+        self.log.write('Archive: {}'.format(format_size(size)))
 
     def getfile(self):
         if not self._closed:

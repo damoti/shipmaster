@@ -2,23 +2,19 @@ import os
 from docker import Client
 from .config import ProjectConf, LayerConf
 from .script import Archive, Script, APP_PATH
+from .utils import UnbufferedLineIO
 
 
 class Project:
 
-    def __init__(self, conf: ProjectConf, log, build_num='latest', job_num='latest', verbose=False, debug_ssh_agent=False):
+    def __init__(self, conf: ProjectConf, log, build_num='0', job_num='0', verbose=False, debug_ssh_agent=False):
         self.conf = conf
-        self.log = log
+        self.log = UnbufferedLineIO(log) if not isinstance(log, UnbufferedLineIO) else log
         self.build_num = build_num
         self.job_num = job_num
         self.verbose = verbose
         self.debug_ssh_agent = debug_ssh_agent
         self.client = Client('unix://var/run/docker.sock')
-
-        self.base = BaseLayer(self, self.conf.base)
-        self.app = AppLayer(self, self.conf.app)
-        self.test = TestLayer(self, self.conf.test)
-        self.dev = DevLayer(self, self.conf.dev)
 
         self.ssh_auth_filename = os.path.basename(os.environ['SSH_AUTH_SOCK'])
         self.local_ssh_auth_dir = os.path.dirname(os.environ['SSH_AUTH_SOCK'])
@@ -31,48 +27,64 @@ class Project:
             )
         }
 
+        self.volumes = [
+            '{}:{}'.format(self.local_ssh_auth_dir, self.image_ssh_auth_dir)
+        ]
+
+        self.base = BaseLayer(self, self.conf.base)
+        self.app = AppLayer(self, self.conf.app)
+        self.test = TestLayer(self, self.conf.test)
+        self.dev = DevLayer(self, self.conf.dev)
+
 
 class LayerBase:
 
     def __init__(self, project: Project, layer: LayerConf):
         self.project = project
         self.layer = layer
-        self.archive = Archive(project.conf.workspace)
+        self.log = project.log
+        self.archive = Archive(project.conf.workspace, project.log)
+        self.environment = {**project.environment, **layer.environment}
+        self.volumes = project.volumes.copy()
 
-    def start_and_commit(self, container, tag):
+    def start_and_commit(self, container):
         client = self.project.client
-        log = self.project.log
-        log.write('put archive\n')
-        log.flush()
+        self.log.write('Uploading...')
         client.put_archive(container, '/', self.archive.getfile())
-        log.write('starting container\n')
-        log.flush()
+        self.log.write('Starting...')
         client.start(container)
         for line in client.logs(container, stream=True):
-            log.write(line.decode())
-            log.flush()
+            self.log.write(line.decode(), newline=False)
         client.stop(container)
-        client.commit(container, repository=self.layer.repository, tag=tag)
+        repository, tag = self.image_name.split(':')
+        client.commit(container, repository=repository, tag=tag)
         client.remove_container(container)
 
-    def create(self, script, volumes):
+    def create(self, script):
         result = self.project.client.create_container(
-            self.layer.from_image, command=['/bin/sh', '-c', script.path],
-            volumes=[v.split(':')[1] for v in volumes],
-            environment=self.layer.environment,
-            host_config=self.project.client.create_host_config(binds=volumes)
+            self.from_image, command=['/bin/sh', '-c', script.path],
+            volumes=[v.split(':')[1] for v in self.volumes],
+            environment=self.environment,
+            host_config=self.project.client.create_host_config(binds=self.volumes)
         )
         return result.get('Id')
+
+    def exists(self):
+        return bool(self.image_info)
+
+    @property
+    def from_image(self):
+        return self.layer.from_image
+
+    @property
+    def image_name(self):
+        return "{}:latest".format(self.layer.repository)
 
     def print_image(self):
         image = self.image_info
         if image:
             image_hash = image['Id'].split(':')[1]
             print("{} {}".format(image['RepoTags'][0], image_hash[:12]))
-
-    @property
-    def image_name(self):
-        return "{}:b{}".format(self.layer.repository, self.project.build_num)
 
     @property
     def image_info(self):
@@ -95,22 +107,26 @@ class BaseLayer(LayerBase):
         return script
 
     def build(self):
+        self.log.write('Building: {} FROM {}'.format(self.image_name, self.from_image))
+
         script = self.get_script()
         self.archive.add_script(script)
         self.archive.add_bundled_file('wait-for-it/wait-for-it.sh')
         for file in self.layer.context:
             self.archive.add_project_file(file)
 
-        volumes = [
-            '{}:{}'.format(self.project.local_ssh_auth_dir, self.project.image_ssh_auth_dir)
-        ]
-
-        container = self.create(script, volumes)
-
-        self.start_and_commit(container, 'latest')
+        self.start_and_commit(self.create(script))
 
 
 class AppLayer(LayerBase):
+
+    @property
+    def image_name(self):
+        return "{}:b{}".format(self.layer.repository, self.project.build_num)
+
+    @property
+    def from_image(self):
+        return self.project.base.image_name
 
     def get_script(self):
         script = Script('build_app.sh')
@@ -120,26 +136,29 @@ class AppLayer(LayerBase):
 
     def build(self):
 
+        if not self.project.base.exists():
+            self.project.base.build()
+
+        self.log.write('Building: {} FROM {}'.format(self.image_name, self.from_image))
+
         script = self.get_script()
         self.archive.add_script(script)
 
         for file in self.layer.context:
             self.archive.add_project_file(file)
 
-        volumes = [
-            '{}:{}'.format(self.project.local_ssh_auth_dir, self.project.image_ssh_auth_dir)
-        ]
-
-        self.project.log.write('# Creating container...\n')
-        self.project.log.flush()
-        container = self.create(script, volumes)
-        self.project.log.write('# Finished creating container...\n')
-        self.project.log.flush()
-
-        self.start_and_commit(container, 'b{}'.format(self.project.build_num))
+        self.start_and_commit(self.create(script))
 
 
 class TestLayer(LayerBase):
+
+    @property
+    def image_name(self):
+        return "{}:j{}".format(self.layer.repository, self.project.job_num)
+
+    @property
+    def from_image(self):
+        return self.project.app.image_name
 
     def get_script(self):
         script = Script('test_app.sh')
@@ -149,49 +168,52 @@ class TestLayer(LayerBase):
 
     def build(self):
 
+        if not self.project.app.exists():
+            self.project.app.build()
+
+        self.log.write('Building: {} FROM {}'.format(self.image_name, self.from_image))
+
         script = self.get_script()
         self.archive.add_script(script)
 
         for file in self.layer.context:
             self.archive.add_project_file(file)
 
-        volumes = [
-            '{}:{}'.format(self.project.local_ssh_auth_dir, self.project.image_ssh_auth_dir)
-        ]
-
-        container = self.create(script, volumes)
-
-        self.start_and_commit(container, 'j{}'.format(self.project.job_num))
+        self.start_and_commit(self.create(script))
 
 
 class DevLayer(LayerBase):
 
-    def __init__(self, project: Project, layer: LayerConf):
-        super().__init__(project, layer)
-        self.app_layer = project.app.layer
+    @property
+    def from_image(self):
+        return self.project.base.image_name
 
     def get_script(self):
+        app_layer = self.project.app.layer
         script = Script('build_dev.sh')
         script.write('# App')
-        script.write_apt_get(self.app_layer.apt_get)
+        script.write_apt_get(app_layer.apt_get)
         script.write('# Dev')
         script.write_apt_get(self.layer.apt_get)
         script.write()
         script.write('# App')
-        script.write_build(self.app_layer.script)
+        script.write_build(app_layer.script)
         script.write('# Dev')
         script.write_build(self.layer.script)
         return script
 
     def build(self):
+
+        if not self.project.base.exists():
+            self.project.base.build()
+
+        self.log.write('Building: {} FROM {}'.format(self.image_name, self.from_image))
+
         script = self.get_script()
         self.archive.add_script(script)
 
-        volumes = [
+        self.volumes += [
             '{}:{}'.format(self.project.conf.workspace, APP_PATH),
-            '{}:{}'.format(self.project.local_ssh_auth_dir, self.project.image_ssh_auth_dir)
         ]
 
-        container = self.create(script, volumes)
-
-        self.start_and_commit(container, 'latest')
+        self.start_and_commit(self.create(script))

@@ -33,15 +33,9 @@ class LayerConf:
     def __init__(self, project, name, layer):
         self.name = name
         self.repository = '{}/{}'.format(project.name, name)
-        if 'from' in layer:
-            self.from_image = layer['from']
-        else:
-            if name == 'base':
-                raise AttributeError("'base' layer must have 'from' attribute")
-            if name == 'test':
-                self.from_image = project.name+'/app:latest'
-            else:
-                self.from_image = project.name+'/base:latest'
+        self.from_image = layer.get('from')
+        if name == 'base' and not self.from_image:
+            raise AttributeError("'base' layer must have 'from' attribute")
         self.command = layer.get('command')
         self.apt_get = layer.get('apt-get', [])
         self.context = layer.get('context', [])

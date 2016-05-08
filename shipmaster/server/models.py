@@ -362,6 +362,14 @@ class JobPath(YamlPath):
     def log(self):
         return os.path.join(self.absolute, 'job.log')
 
+    @property
+    def job_begin(self):
+        return os.path.join(self.absolute, 'job.begin')
+
+    @property
+    def job_end(self):
+        return os.path.join(self.absolute, 'job.end')
+
 
 class Job(YamlModel):
 
@@ -382,39 +390,32 @@ class Job(YamlModel):
         job.save()
         return job
 
-    def build(self):
-        job_channel.send({
-            'path': build.path.absolute
-        })
+    def get_project(self, log):
+        return Project(
+            ProjectConf.from_workspace(self.build.path.workspace),
+            build_num=self.build.number,
+            job_num=self.number,
+            log=log
+        )
 
-    def start(self):
-        client = Client('unix://var/run/docker.sock')
-        shipmaster_yaml = os.path.join(self.path.workspace, '.shipmaster.yaml')
-        conf = ShipmasterConf.from_filename('test', shipmaster_yaml)
-        conf.services.environment['GIT_SSH_COMMAND'] = "ssh -F {}".format(self.shipmaster.path.ssh_config)
-        conf.services.volumes += ['{0}:{0}'.format(self.shipmaster.path.ssh_dir)]
-        containers = services.up(conf, client, log=False)
-        cdict = {}
-        for c in containers:
-            cdict[c.service] = {
-                'containerId': c.id,
-                'imageId': c.image,
-                'repo': c.image_config['RepoTags'][0]
-            }
-        with open(self.path.containers, 'w') as cf:
-            yaml.dump(cdict, cf)
+    def test(self):
+        Channel("run-test").send({'path': self.path.absolute})
 
-    def log(self):
-        client = Client('unix://var/run/docker.sock')
-        shipmaster_yaml = os.path.join(self.path.workspace, '.shipmaster.yaml')
-        conf = ShipmasterConf.from_filename('test', shipmaster_yaml)
-        project = services.get_project(conf, client)
-        containers = [Container.from_id(client, cid) for cid in self.containers]
-        return services.LogPrinter(
-            filter_containers_to_service_names(containers, ['app']),
-            build_log_presenters(['app'], False),
-            project.events(service_names=['app']),
-            cascade_stop=True).run()
+    @property
+    def has_job_started(self):
+        return os.path.exists(self.path.job_begin)
+
+    @property
+    def has_job_finished(self):
+        return os.path.exists(self.path.job_end)
+
+    def job_started(self):
+        assert not self.has_job_started
+        record_time(self.path.job_begin)
+
+    def job_finished(self):
+        assert not self.has_job_finished
+        record_time(self.path.job_end)
 
     def deploy(self):
         client = Client('unix://var/run/docker.sock')

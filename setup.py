@@ -14,6 +14,7 @@ setup(name='shipmaster',
       license='BSD',
       packages=['shipmaster'],
       install_requires=[
+          'humanfriendly',
           'docker-map',
           'docker-compose',
           'ruamel.yaml'
