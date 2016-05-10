@@ -149,6 +149,63 @@ class AppLayer(LayerBase):
 
         self.start_and_commit(self.create(script))
 
+    def deploy(self):
+
+        client = self.project.client
+        log = self.log
+
+        # stop dev
+        # pre-deploy script:
+        #  - copy production to dev
+        #  - migrate
+        # start script:
+        #  - runserver
+
+        deployed_container_name = 'systori_django_dev'
+
+        # Remove existing dev
+        if client.containers(all=True, filters={'name': deployed_container_name}):
+            log.write("Stopping existing container.")
+            client.stop(deployed_container_name)
+            log.write("Removing existing container.")
+            client.remove_container(deployed_container_name)
+
+        # Pre-deployment script
+        archive = Archive(self.project.conf.workspace, log)
+        script = Script('pre_deploy_script.sh')
+        script.write("cd /app")
+        #script.write("fab copyproductiontodev")
+        #script.write("python3 manage.py migrate")
+        archive.add_script(script)
+        log.write("Running pre-deployment script.")
+        container = self.project.client.create_container(
+            self.image_name, command=['/bin/sh', '-c', script.path],
+            volumes=[v.split(':')[1] for v in self.volumes],
+            environment=self.environment,
+            host_config=self.project.client.create_host_config(binds=self.volumes)
+        )
+        client.put_archive(container, '/', archive.getfile())
+        client.start(container)
+        log.write("Waiting.")
+        client.wait(container, 60*5)  # Timeout if not finished after 5 minutes
+        log.write(client.logs(container).decode(), newline=False)
+        client.remove_container(container)
+
+        # Deploy App container
+        self.log.write("Starting new container.")
+        container = self.project.client.create_container(
+            self.image_name, command=['/bin/sh', '-c', 'python3 manage.py runserver 0.0.0.0:8000'],
+            name=deployed_container_name, working_dir='/app', detach=True,
+            volumes=[v.split(':')[1] for v in self.volumes],
+            environment=self.environment,
+            host_config=self.project.client.create_host_config(binds=self.volumes)
+        )
+        client.start(container)
+        try:
+            client.wait(container, 5)
+        finally:
+            log.write(client.logs(container).decode(), newline=False)
+
 
 class TestLayer(LayerBase):
 

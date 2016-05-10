@@ -39,6 +39,14 @@ def build_app(message):
         build.build_finished()
 
 
+def deploy_app(message):
+    build = Build.from_path(message.content['path'])
+    with open(build.path.log, 'a') as buffered:
+        log = UnbufferedLineIO(buffered)
+        project = build.get_project(log)
+        project.app.deploy()
+
+
 def run_test(message):
     job = Job.from_path(message.content['path'])
     with open(job.path.log, 'a') as buffered:

@@ -39,7 +39,10 @@ def main():
         proj.base.build()
 
     elif args.layer == 'app':
-        proj.app.build()
+        if not proj.app.exists():
+            proj.app.build()
+        print("Deploying App")
+        proj.app.deploy()
 
     elif args.layer == 'test':
         proj.test.build()

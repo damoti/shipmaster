@@ -90,6 +90,19 @@ class ViewBuildOutput(View):
             return HttpResponse(err.output)
 
 
+class DeployBuild(View):
+
+    def get(self, request, *args, **kwargs):
+        repo = request.current_repo
+        build = request.current_build
+        try:
+            build.deploy()
+        except CalledProcessError as err:
+            return HttpResponse(err.output)
+        else:
+            return HttpResponseRedirect(reverse('build.view', args=[repo.name, build.number]))
+
+
 class StartJob(View):
 
     def get(self, request, *args, **kwargs):
@@ -125,20 +138,6 @@ class ViewJobOutput(View):
             return response
         except CalledProcessError as err:
             return HttpResponse(err.output)
-
-
-class DeployJob(View):
-
-    def get(self, request, *args, **kwargs):
-        repo = request.current_repo
-        build = request.current_build
-        job = request.current_job
-        try:
-            job.deploy()
-        except CalledProcessError as err:
-            return HttpResponse(err.output)
-        else:
-            return HttpResponseRedirect(reverse('job.view', args=[repo.name, build.number, job.number]))
 
 
 class ViewSettings(TemplateView):
