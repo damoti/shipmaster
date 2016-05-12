@@ -1,6 +1,0 @@
-{% extends "shipmaster/base.html" %}
-{% load i18n %}
-
-{% block content %}
-  <iframe src="{% url "build.output" current_repo.name current_build.number %}" height="250" width="100%"></iframe>
-{% endblock %}

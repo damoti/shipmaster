@@ -238,8 +238,20 @@ class BuildPath(YamlPath):
         return os.path.join(self.absolute, 'build.end')
 
     @property
-    def log(self):
+    def build_log(self):
         return os.path.join(self.absolute, 'build.log')
+
+    @property
+    def deployment_begin(self):
+        return os.path.join(self.absolute, 'deployment.begin')
+
+    @property
+    def deployment_end(self):
+        return os.path.join(self.absolute, 'deployment.end')
+
+    @property
+    def deployment_log(self):
+        return os.path.join(self.absolute, 'deployment.log')
 
     @property
     def yaml(self):
@@ -343,6 +355,22 @@ class Build(YamlModel):
         assert not self.has_build_finished
         record_time(self.path.build_end)
 
+    @property
+    def has_deployment_started(self):
+        return os.path.exists(self.path.deployment_begin)
+
+    @property
+    def has_deployment_finished(self):
+        return os.path.exists(self.path.deployment_end)
+
+    def deployment_started(self):
+        assert not self.has_deployment_started
+        record_time(self.path.deployment_begin)
+
+    def deployment_finished(self):
+        assert not self.has_deployment_finished
+        record_time(self.path.deployment_end)
+
 
 class JobPath(YamlPath):
 
@@ -416,16 +444,6 @@ class Job(YamlModel):
     def job_finished(self):
         assert not self.has_job_finished
         record_time(self.path.job_end)
-
-    def deploy(self):
-        client = Client('unix://var/run/docker.sock')
-        shipmaster_yaml = os.path.join(self.path.workspace, '.shipmaster.yaml')
-        conf = ShipmasterConf.from_filename('app', shipmaster_yaml)
-        with open(self.path.containers, 'r') as cf:
-            containers = yaml.load(cf)
-        conf.services.services['app']['image'] = containers['app']['imageId']
-        conf.services.services['app']['ports'] = []  # '{0}:{0}'.format(randint(2000, 8000))]
-        services.up(conf, client, log=False)
 
 
 def record_time(path):

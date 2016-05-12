@@ -58,13 +58,9 @@ class PullRequest(View):
 
     def get(self, request, *args, **kwargs):
         repo = request.current_repo
-        try:
-            build = Build.create(repo, 'docker')
-            build.build()
-        except CalledProcessError as err:
-            return HttpResponse(err.output)
-        else:
-            return HttpResponseRedirect(reverse('build.view', args=[repo.name, build.number]))
+        build = Build.create(repo, 'docker')
+        build.build()
+        return HttpResponseRedirect(reverse('build.view', args=[repo.name, build.number]))
 
 
 class ViewBuild(TemplateView):
@@ -76,12 +72,11 @@ class ViewBuild(TemplateView):
         return context
 
 
-class ViewBuildOutput(View):
+class ViewLog(View):
 
     def get(self, request, *args, **kwargs):
-        build = request.current_build  # type: Build
         try:
-            response = FileResponse(open(build.path.log, 'r'), content_type="text/event-stream")
+            response = FileResponse(open(self.get_log_path(request), 'r'), content_type="text/event-stream")
             response.block_size = 128
             response['Cache-Control'] = 'no-cache'
             response['X-Accel-Buffering'] = 'no'
@@ -89,18 +84,29 @@ class ViewBuildOutput(View):
         except CalledProcessError as err:
             return HttpResponse(err.output)
 
+    def get_log_path(self, request):
+        raise NotImplementedError
+
+
+class ViewBuildLog(ViewLog):
+    def get_log_path(self, request):
+        build = request.current_build
+        return build.path.build_log
+
+
+class ViewDeploymentLog(ViewLog):
+    def get_log_path(self, request):
+        build = request.current_build
+        return build.path.deployment_log
+
 
 class DeployBuild(View):
 
     def get(self, request, *args, **kwargs):
         repo = request.current_repo
         build = request.current_build
-        try:
-            build.deploy()
-        except CalledProcessError as err:
-            return HttpResponse(err.output)
-        else:
-            return HttpResponseRedirect(reverse('build.view', args=[repo.name, build.number]))
+        build.deploy()
+        return HttpResponseRedirect(reverse('build.view', args=[repo.name, build.number]))
 
 
 class StartJob(View):
@@ -108,13 +114,9 @@ class StartJob(View):
     def get(self, request, *args, **kwargs):
         repo = request.current_repo
         build = request.current_build
-        try:
-            job = Job.create(build)
-            job.test()
-        except CalledProcessError as err:
-            return HttpResponse(err.output)
-        else:
-            return HttpResponseRedirect(reverse('job.view', args=[repo.name, build.number, job.number]))
+        job = Job.create(build)
+        job.test()
+        return HttpResponseRedirect(reverse('job.view', args=[repo.name, build.number, job.number]))
 
 
 class ViewJob(TemplateView):
@@ -126,18 +128,10 @@ class ViewJob(TemplateView):
         return context
 
 
-class ViewJobOutput(View):
-
-    def get(self, request, *args, **kwargs):
+class ViewJobLog(ViewLog):
+    def get_log_path(self, request):
         job = request.current_job
-        try:
-            response = FileResponse(open(job.path.log, 'r'), content_type="text/event-stream")
-            response.block_size = 128
-            response['Cache-Control'] = 'no-cache'
-            response['X-Accel-Buffering'] = 'no'
-            return response
-        except CalledProcessError as err:
-            return HttpResponse(err.output)
+        return job.path.log
 
 
 class ViewSettings(TemplateView):

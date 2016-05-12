@@ -16,7 +16,9 @@ def build_app(message):
 
     build = Build.from_path(message.content['path'])
 
-    with open(build.path.log, 'a') as buffered:
+    assert not build.has_cloning_started
+
+    with open(build.path.build_log, 'a') as buffered:
 
         log = UnbufferedLineIO(buffered)
 
@@ -40,11 +42,20 @@ def build_app(message):
 
 
 def deploy_app(message):
+
     build = Build.from_path(message.content['path'])
-    with open(build.path.log, 'a') as buffered:
+
+    assert not build.has_deployment_started
+
+    with open(build.path.deployment_log, 'a') as buffered:
+
         log = UnbufferedLineIO(buffered)
+
         project = build.get_project(log)
+
+        build.deployment_started()
         project.app.deploy()
+        build.deployment_finished()
 
 
 def run_test(message):

@@ -126,7 +126,7 @@ class Archive:
         relative = os.path.relpath(abspath, APP_PATH)
         for pattern in self.exclude:
             if fnmatch(relative, pattern):
-                print('excluding '+relative)
+                self.log.write('excluding '+relative)
                 return None
         return info
 

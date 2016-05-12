@@ -154,14 +154,9 @@ class AppLayer(LayerBase):
         client = self.project.client
         log = self.log
 
-        # stop dev
-        # pre-deploy script:
-        #  - copy production to dev
-        #  - migrate
-        # start script:
-        #  - runserver
+        deployed_container_name = "{}_dev".format(self.layer.repository.replace('/', '_'))
 
-        deployed_container_name = 'systori_django_dev'
+        log.write("Deploying: {} as {}".format(self.image_name, deployed_container_name))
 
         # Remove existing dev
         if client.containers(all=True, filters={'name': deployed_container_name}):

@@ -2,13 +2,16 @@
 {% load i18n %}
 
 {% block content %}
-  <iframe src="{% url "build.output" current_repo.name current_build.number %}" height="250" width="100%"></iframe>
+  <iframe src="{% url "build.log" current_repo.name current_build.number %}" height="250" width="100%"></iframe>
+  {% if current_build.has_deployment_started %}
+  <iframe src="{% url "build.deployment.log" current_repo.name current_build.number %}" height="250" width="100%"></iframe>
+  {% endif %}
   <a href="{% url "job.start" current_repo.name current_build.number %}">{% trans "Start Job" %}</a>
+  <a href="{% url "build.deploy" current_repo.name current_build.number %}">{% trans "Deploy Build" %}</a>
   <ul>
     {% for job in current_build.jobs %}
       <li>
         <a href="{% url "job.view" current_repo.name current_build.number job.number %}">{{ job.number }}</a>
-        <a href="{% url "job.deploy" current_repo.name current_build.number job.number %}">deploy</a>
       </li>
     {% endfor %}
   </ul>
