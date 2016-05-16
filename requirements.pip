@@ -1,4 +1,6 @@
 django
 django-bootstrap-form
 channels
+celery
+requests_oauthlib
 -e .

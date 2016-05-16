@@ -17,8 +17,8 @@ from ruamel import yaml
 
 from shipmaster.base.builder import Project
 from shipmaster.base.config import ProjectConf
-from . import services
 
+from .user import User
 
 class YamlPath:
     @property
@@ -316,10 +316,12 @@ class Build(YamlModel):
             yield Job.load(self, job)
 
     def build(self):
-        Channel("build-app").send({'path': self.path.absolute})
+        from .tasks import build_app
+        build_app.delay(self.path.absolute)
 
     def deploy(self):
-        Channel("deploy-app").send({'path': self.path.absolute})
+        from .tasks import deploy_app
+        deploy_app.delay(self.path.absolute)
 
     # Timers & Progress
 

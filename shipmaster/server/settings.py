@@ -1,5 +1,7 @@
 import os
 
+CELERY_ACCEPT_CONTENT = ['json']
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -17,6 +19,8 @@ CHANNEL_LAYERS = {
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = '*z_fl)u0=5ovn-v2gp)c!=f6kux^da)h()-7y)f!7odle_+w=5'
+
+AUTH_USER_MODEL = 'server.User'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -44,10 +48,15 @@ MIDDLEWARE_CLASSES = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
+    'shipmaster.server.middleware.AccessTokenUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'shipmaster.server.middleware.ShipmasterMiddleware'
+]
+
+AUTHENTICATION_BACKENDS = [
+    'shipmaster.server.auth.AccessTokenUserBackend',
+    'django.contrib.auth.backends.ModelBackend'
 ]
 
 ROOT_URLCONF = 'shipmaster.server.urls'
@@ -77,7 +86,7 @@ WSGI_APPLICATION = 'shipmaster.server.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'NAME': os.path.join(SHIPMASTER_DATA, 'db.sqlite3'),
     }
 }
 
@@ -118,4 +127,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.9/howto/static-files/
 
+# this is where files are copied when running ./manage.py collectstatic
+STATIC_ROOT = os.path.normpath(os.path.join(BASE_DIR, '..', 'static'))
 STATIC_URL = '/static/'
+
+STATICFILES_DIRS = [
+    'shipmaster/server/static',
+]

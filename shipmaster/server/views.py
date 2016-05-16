@@ -1,3 +1,5 @@
+import io
+import time
 from subprocess import CalledProcessError
 from django.http import HttpResponse
 from django.http import HttpResponseRedirect
@@ -76,10 +78,25 @@ class ViewLog(View):
 
     def get(self, request, *args, **kwargs):
         try:
-            response = FileResponse(open(self.get_log_path(request), 'r'), content_type="text/event-stream")
-            response.block_size = 128
-            response['Cache-Control'] = 'no-cache'
-            response['X-Accel-Buffering'] = 'no'
+            def streamer(path):
+                with open(path, 'r') as file:
+                    waited = 0
+                    while True:
+                        line = file.readline()
+                        if line != "":
+                            waited = 0
+                            yield "data: {}\n\n".format(line).encode('utf-8')
+                        else:
+                            waited += 1
+                            if waited == 10:
+                                yield "data: closed\n\n".encode('utf-8')
+                                break
+                            time.sleep(2)
+
+            response = StreamingHttpResponse(streamer(self.get_log_path(request)), content_type="text/event-stream")
+            #response.block_size = 128
+            #response['Cache-Control'] = 'no-cache'
+            #response['X-Accel-Buffering'] = 'no'
             return response
         except CalledProcessError as err:
             return HttpResponse(err.output)

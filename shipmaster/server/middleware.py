@@ -1,3 +1,4 @@
+from django.contrib.auth.backends import RemoteUserBackend
 from .models import Shipmaster, Repository, Build, Job
 
 
@@ -22,3 +23,7 @@ class ShipmasterMiddleware:
             response.context_data['current_build'] = request.current_build
             response.context_data['current_job'] = request.current_job
         return response
+
+
+class AccessTokenUserMiddleware(RemoteUserBackend):
+    header = "HTTP_X_FORWARDED_ACCESS_TOKEN"

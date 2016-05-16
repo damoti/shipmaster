@@ -2,158 +2,102 @@
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
 <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="Shipmaster">
-    <meta name="author" content="Lex Berezhny <lex@damoti.com>">
-    <link href="data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAIcXAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAEAEAEAAAAAABAQEAAAAAAAAREAAAAREREREREQAAAAAAERAAAAAAAAEBAQAAAAAAEAEAEAAAAAAAAQAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" rel="icon" type="image/x-icon" />
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  <meta name="description" content="Shipmaster">
+  <meta name="author" content="Lex Berezhny <lex@damoti.com>">
+  <link href="data:image/x-icon;base64,AAABAAEAEBAAAAAAAABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJC5XYCUuVHUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACEsVXIiLVWLAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALDhhnCEnUj0AAAAAFRZFEyYvU4IhN132HTdd+icuU4wYGkcZAAAAAB0kUSkpNl2pAAAAAAAAAAAAAAAAAAAAAB0jUCkmN2LJJTJYvB9Ie/sbP3H/Hj1q/x4+bP8ZOGf/G0R5/SMwVr4iNF3QICVPNQAAAAAAAAAAAAAAAAAAAAAAAAAAKTRbnxhalv8eTof+JSxTUyc1Xa0lM1vDJClRSh9Gd/wXVZP/JTJYvwAAAAAAAAAAAAAAAAAAAAAAAAAAERJCCyBDePkgS4P8IDln9CAlT0EnNl+3JTRf0B8mUDceMl7xHkN2+hg/cvwZGkcYAAAAAAAAAAAAAAAAAAAAACctVF4TQoT/Jy5WXxgcTBsWNmz+J3yl/yVwl/8UN2z/ICVQNSEmTj0SOnX/KDBXhgAAAAAAAAAALjhhcis2YYYkPnL2GVKW/ys8aMoqNGHEIGyZ/za3yP80tsf/H3ii/yg3Y80qNmDAFUWA/x08bPkpNl+OKjVddi04YWMtOGJ1KEF07xxdpf8vP2y8LTdhriJmmf9n2uX/aNvl/yJ6pv8rN2K6LDpkrxpRk/8hPnL2KDVgfSo2XmUAAAAAAAAAACguVlMYWKr/LjVdbRcdTSQdPXr+Oo+1/jeAqf8cQHv+IilVQCcrVEwZUZz/KzFZegAAAAAAAAAAAAAAAAAAAAARE0MIKUF59CdOkP4kR4T4ICRQLi45ZaotN2THIidTJCVCevQpS4j9JD51+hYYRxEAAAAAAAAAAAAAAAAAAAAAAAAAADI7Z5wqZLX/JkuS/y82XnMvPmy5LT5szS0yWmopSIf+KWSt/zE8aLsAAAAAAAAAAAAAAAAAAAAAAAAAACgvWjcxRnfIND5qpTVKgfQue8P/MYzJ/zGLyP8ufsP/NEqE+TQ/aKUxSXrMJy1YQgAAAAAAAAAAAAAAAAAAAAA1Q22TJyxYMwAAAAARE0QHMDVdXThUiu82VY/2LzVeZRgaSA0AAAAAGyJQIDVEcJ4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAsN2JsLjljhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDtlXzI7ZXQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//8AAP9/AADcOwAA4AcAAOJHAADiRwAA7DMAAIABAADAAwAA7DcAAOJHAADiRwAA4AcAAN57AAD/fwAA//8AAA==" rel="icon" type="image/x-icon" />
 
-    <title>Shipmaster</title>
+  <title>Shipmaster</title>
 
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.2/css/bootstrap.min.css" integrity="sha384-y3tfxAZXuh4HwSYylfB+J125MxIs6mR5FOHamPBG064zB+AFeWH94NdvaCBm8qnd" crossorigin="anonymous">
-    <style>
-    /* Move down content because we have a fixed navbar that is 50px tall */
-    body {
-      padding-top: 50px;
-    }
-
-    .sub-header {
-      padding-bottom: 10px;
-      border-bottom: 1px solid #eee;
-    }
-
-    /*
-     * Top navigation
-     * Hide default border to remove 1px line.
-     */
-    .navbar-fixed-top {
-      border: 0;
-    }
-
-    /* Hide for mobile, show later */
-    .sidebar {
-      display: none;
-    }
-    @media (min-width: 768px) {
-      .sidebar {
-        position: fixed;
-        top: 51px;
-        bottom: 0;
-        left: 0;
-        z-index: 1000;
-        display: block;
-        padding: 20px;
-        overflow-x: hidden;
-        overflow-y: auto; /* Scrollable contents if viewport is shorter than content. */
-        background-color: #f5f5f5;
-        border-right: 1px solid #eee;
-      }
-    }
-
-    /* Sidebar navigation */
-    .nav-sidebar {
-      margin-right: -21px; /* 20px padding + 1px border */
-      margin-bottom: 20px;
-      margin-left: -20px;
-    }
-    .nav-sidebar > li > a {
-      padding-right: 20px;
-      padding-left: 20px;
-    }
-    .nav-sidebar > .active > a,
-    .nav-sidebar > .active > a:hover,
-    .nav-sidebar > .active > a:focus {
-      color: #fff;
-      background-color: #428bca;
-    }
-
-
-    .main {
-      padding: 20px;
-    }
-    @media (min-width: 768px) {
-      .main {
-        padding-right: 40px;
-        padding-left: 40px;
-      }
-    }
-    .main .page-header {
-      margin-top: 0;
-    }
-
-
-    .placeholders {
-      margin-bottom: 30px;
-      text-align: center;
-    }
-    .placeholders h4 {
-      margin-bottom: 0;
-    }
-    .placeholder {
-      margin-bottom: 20px;
-    }
-    .placeholder img {
-      display: inline-block;
-      border-radius: 50%;
-    }
-    </style>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:regular,bold,italic,thin,light,bolditalic,black,medium&amp;lang=en">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="{% static "material.css" %}">
+  <link rel="stylesheet" href="{% static "material-grid.css" %}">
+  <link rel="stylesheet" href="{% static "styles.css" %}">
 </head>
 
 <body>
-
-    <nav class="navbar navbar-dark navbar-fixed-top bg-inverse">
-      <button type="button" class="navbar-toggler hidden-sm-up" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
-        <span class="sr-only">Toggle navigation</span>
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-      </button>
-      <a class="navbar-brand" href="/">Shipmaster</a>
-      <div id="navbar">
-        <nav class="nav navbar-nav pull-xs-left">
-          <a class="nav-item nav-link" href="{% url "dashboard" %}">{% trans "Dashboard" %}</a>
-          <a class="nav-item nav-link" href="{% url "settings" %}">{% trans "Settings" %}</a>
+    <div class="demo-layout mdl-layout mdl-js-layout mdl-layout--fixed-drawer mdl-layout--fixed-header">
+      <header class="demo-header mdl-layout__header mdl-color--grey-100 mdl-color-text--grey-600">
+        <div class="mdl-layout__header-row">
+          <span class="mdl-layout-title">Home</span>
+          <div class="mdl-layout-spacer"></div>
+          <div class="mdl-textfield mdl-js-textfield mdl-textfield--expandable">
+            <label class="mdl-button mdl-js-button mdl-button--icon" for="search">
+              <i class="material-icons">search</i>
+            </label>
+            <div class="mdl-textfield__expandable-holder">
+              <input class="mdl-textfield__input" type="text" id="search">
+              <label class="mdl-textfield__label" for="search">Enter your query...</label>
+            </div>
+          </div>
+          <button class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon" id="hdrbtn">
+            <i class="material-icons">more_vert</i>
+          </button>
+          <ul class="mdl-menu mdl-js-menu mdl-js-ripple-effect mdl-menu--bottom-right" for="hdrbtn">
+            <li class="mdl-menu__item">About</li>
+            <li class="mdl-menu__item">Contact</li>
+            <li class="mdl-menu__item">Legal information</li>
+          </ul>
+        </div>
+      </header>
+      <div class="demo-drawer mdl-layout__drawer mdl-color--blue-grey-900 mdl-color-text--blue-grey-50">
+        <header class="demo-drawer-header">
+          <img src="{% static "images/user.jpg" %}" class="demo-avatar">
+          <div class="demo-avatar-dropdown">
+            <span>hello@example.com</span>
+            <div class="mdl-layout-spacer"></div>
+            <button id="accbtn" class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--icon">
+              <i class="material-icons" role="presentation">arrow_drop_down</i>
+              <span class="visuallyhidden">Accounts</span>
+            </button>
+            <ul class="mdl-menu mdl-menu--bottom-right mdl-js-menu mdl-js-ripple-effect" for="accbtn">
+              <li class="mdl-menu__item">hello@example.com</li>
+              <li class="mdl-menu__item">info@example.com</li>
+              <li class="mdl-menu__item"><i class="material-icons">add</i>Add another account...</li>
+            </ul>
+          </div>
+        </header>
+        <nav class="demo-navigation mdl-navigation mdl-color--blue-grey-800">
+          {% for repo in shipmaster.repositories %}
+            <a class="mdl-navigation__link {% if repo == current_repo %}mdl-navigation__link--current{% endif %}"
+               href="{% url 'repository' repo.name %}">
+              <i class="mdl-color-text--blue-grey-400 material-icons" role="presentation">folder</i>
+              {{ repo.name }}
+            </a>
+            {% if repo == current_repo and current_build != None %}
+              <a class="mdl-navigation__link mdl-navigation__link--current"
+                 href="{% url 'build.view' repo.name current_build.number %}">
+                <i class="mdl-color-text--blue-grey-400 material-icons" role="presentation">build</i>
+                Build# {{ current_build.number }}
+              </a>
+              {% if current_job != None %}
+                <a class="mdl-navigation__link mdl-navigation__link--current"
+                   href="{% url 'job.view' repo.name current_build.number current_job.number %}">
+                  <i class="mdl-color-text--blue-grey-400 material-icons" role="presentation">directions_run</i>
+                  Job# {{ current_job.number }}
+                </a>
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          <a class="mdl-navigation__link" href="{% url 'repository.create' %}">
+            <i class="mdl-color-text--blue-grey-400 material-icons" role="presentation">add_circle</i> Add Repository
+          </a>
+          <div class="mdl-layout-spacer"></div>
+          <a class="mdl-navigation__link" href=""><i class="mdl-color-text--blue-grey-400 material-icons" role="presentation">help_outline</i><span class="visuallyhidden">Help</span></a>
         </nav>
-        <form class="pull-xs-right">
-          <input type="text" class="form-control" placeholder="Search...">
-        </form>
       </div>
-    </nav>
-
-    <div class="container-fluid">
-      <div class="row">
-        <div class="col-sm-3 col-md-2 sidebar">
-          <ul class="nav nav-sidebar">
-            {% for repo in shipmaster.repositories %}
-              <li {% if repo == current_repo %}class="active"{% endif %}>
-                <a href="{% url 'repository' repo.name %}">{{ repo.name }}</a>
-                  {% if repo == current_repo and current_build != None %} >
-                    <a href="{% url 'build.view' repo.name current_build.number %}">
-                      Build# {{ current_build.number }}
-                    </a>
-                    {% if current_job != None %} >
-                      <a href="{% url 'job.view' repo.name current_build.number current_job.number %}">
-                        Job# {{ current_job.number }}
-                      </a>
-                    {% endif %}
-                  {% endif %}
-              </li>
-            {% endfor %}
-          </ul>
-          <ul class="nav nav-sidebar">
-            <li><a href="{% url 'repository.create' %}">Add Repository</a></li>
-          </ul>
-        </div>
-        <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
-
+      <main class="mdl-layout__content mdl-color--grey-100">
+        <div class="mdl-grid demo-content">
+        <div class="demo-graphs mdl-shadow--2dp mdl-color--white mdl-cell mdl-cell--8-col">
         {% block content %}{% endblock content %}
-
         </div>
-      </div>
+        </div>
+      </main>
     </div>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.2/js/bootstrap.min.js" integrity="sha384-vZ2WRJMwsjRMW/8U7i6PWi6AlO1L79snBrmgiDpgIWJ82z8eA5lenwvxbMV1PAh7" crossorigin="anonymous"></script>
+    <script src="{% static "material.js" %}"></script>
 </body>
 
 </html>

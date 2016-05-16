@@ -2,10 +2,8 @@
 {% load i18n %}
 
 {% block content %}
-  <iframe src="{% url "build.log" current_repo.name current_build.number %}" height="250" width="100%"></iframe>
-  {% if current_build.has_deployment_started %}
-  <iframe src="{% url "build.deployment.log" current_repo.name current_build.number %}" height="250" width="100%"></iframe>
-  {% endif %}
+  <div class="build-log"></div>
+  <div class="deploy-log"></div>
   <a href="{% url "job.start" current_repo.name current_build.number %}">{% trans "Start Job" %}</a>
   <a href="{% url "build.deploy" current_repo.name current_build.number %}">{% trans "Deploy Build" %}</a>
   <ul>
@@ -15,4 +13,22 @@
       </li>
     {% endfor %}
   </ul>
+  <script>
+  var build_log = new EventSource("{% url "build.log" current_repo.name current_build.number %}");
+  var build_div = document.querySelector('.build-log');
+  build_log.onmessage = function (e) {
+    if (e.data=="closed") build_log.close();
+    build_div.appendChild(document.createTextNode(e.data));
+    build_div.appendChild(document.createElement('br'));
+  };
+  {% if current_build.has_deployment_started %}
+  var deploy_log = new EventSource("{% url "build.deployment.log" current_repo.name current_build.number %}");
+  var deploy_div = document.querySelector('.deploy-log');
+  deploy_log.onmessage = function (e) {
+    if (e.data=="closed") deploy_log.close();
+    deploy_div.appendChild(document.createTextNode(e.data));
+    deploy_div.appendChild(document.createElement('br'));
+  };
+  {% endif %}
+  </script>
 {% endblock %}

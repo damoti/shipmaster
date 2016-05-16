@@ -2,5 +2,14 @@
 {% load i18n %}
 
 {% block content %}
-  <iframe src="{% url "job.output" current_repo.name current_build.number current_job.number %}" height="250" width="100%"></iframe>
+  <div class="build-log"></div>
+  <script>
+  var build_log = new EventSource("{% url "job.output" current_repo.name current_build.number current_job.number %}");
+  var build_div = document.querySelector('.build-log');
+  build_log.onmessage = function (e) {
+    if (e.data=="closed") build_log.close();
+    build_div.appendChild(document.createTextNode(e.data));
+    build_div.appendChild(document.createElement('br'));
+  };
+  </script>
 {% endblock %}
