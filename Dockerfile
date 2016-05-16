@@ -1,6 +1,6 @@
 FROM damoti/base:latest
 
-RUN apt-get install rabbitmq-server
+RUN apt-get install -y rabbitmq-server
 
 RUN mkdir -p /root/.ssh && \
     ssh-keyscan github.com >> /root/.ssh/known_hosts && \
