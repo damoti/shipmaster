@@ -20,6 +20,7 @@ from shipmaster.base.config import ProjectConf
 
 from .user import User
 
+
 class YamlPath:
     @property
     def yaml(self):

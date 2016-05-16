@@ -8,7 +8,7 @@ RUN mkdir -p /root/.ssh && \
 
 COPY . /usr/lib/shipmaster
 WORKDIR /usr/lib/shipmaster
-RUN mkdir /var/lib/shipmaster
+RUN mkdir -p /var/lib/shipmaster/repos
 RUN pip3 install -r requirements.pip
 RUN python3 manage.py migrate
 
