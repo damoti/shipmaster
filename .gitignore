@@ -1,6 +1,8 @@
 .idea/
 build/
 dist/
-db.sqlite3
 __pycache__
 shipmaster.egg-info
+shipmaster/dart/.packages
+shipmaster/dart/packages/
+shipmaster/dart/pubspec.lock

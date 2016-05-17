@@ -1,0 +1,6 @@
+name: shipmaster
+dependencies:
+  shelf: any
+  shelf_proxy: any
+  shelf_web_socket: any
+  shelf_exception_response: any

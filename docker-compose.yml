@@ -3,16 +3,3 @@ services:
   app:
     build: .
     image: damoti/shipmaster
-    volumes:
-      - .:/usr/lib/shipmaster
-      - /var/lib/shipmaster:/var/lib/shipmaster
-      - /var/run/docker.sock:/var/run/docker.sock
-    ports:
-      - "8000:8000"
-  oauth:
-    image: wingedkiwi/oauth2-proxy
-    volumes:
-      - ./example/oauth2/:/opt/oauth2-proxy/etc/
-    ports:
-      - "443:443"
-      - "4180:4180"
