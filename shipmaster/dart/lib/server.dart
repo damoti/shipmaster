@@ -16,7 +16,7 @@ void main() {
   var proxy = proxyHandler("http://localhost:8000");
 
   var router = route.router()
-      ..('/', proxy)
+      ..add('/', ['GET'], proxy, exactMatch: false)
       ..get('/ws', wshandler);
 
   var handler = const shelf.Pipeline()
