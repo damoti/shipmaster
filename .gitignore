@@ -3,6 +3,8 @@ build/
 dist/
 __pycache__
 shipmaster.egg-info
+shipmaster/dart/.pub/
 shipmaster/dart/.packages
 shipmaster/dart/packages/
+shipmaster/dart/web/packages
 shipmaster/dart/pubspec.lock

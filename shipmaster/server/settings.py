@@ -126,5 +126,6 @@ STATIC_ROOT = os.path.normpath(os.path.join(BASE_DIR, '..', 'static'))
 STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
-    'shipmaster/server/static',
+    ('', 'shipmaster/server/static'),
+    ('dart', 'shipmaster/dart/web')
 ]

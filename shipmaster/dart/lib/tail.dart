@@ -67,7 +67,7 @@ Stream<String> tail(String path) {
 }
 
 main() {
-  tail('/tmp/fakelog').listen((line) {
+  tail('/tmp/some.log').listen((line) {
     print(line);
   });
 }

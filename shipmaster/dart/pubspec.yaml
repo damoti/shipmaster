@@ -1,5 +1,7 @@
 name: shipmaster
 dependencies:
+  browser: any
+  web_components: any
   shelf: any
   shelf_route: any
   shelf_proxy: any
