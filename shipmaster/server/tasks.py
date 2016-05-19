@@ -62,7 +62,7 @@ def deploy_app(path):
 
 
 @shared_task
-def run_test(path):
+def test_app(path):
     job = Job.from_path(path)
     with open(job.path.log, 'a') as buffered:
         log = UnbufferedLineIO(buffered)

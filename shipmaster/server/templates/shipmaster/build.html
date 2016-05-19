@@ -2,19 +2,50 @@
 {% load i18n staticfiles %}
 
 {% block content %}
+
+<div class="mdl-cell mdl-cell--6-col">
+
+  <div class="mdl-card mdl-shadow--2dp">
+    <div class="mdl-card__supporting-text">
+      <h4>Build</h4>
+      <p>A build is created in response to a GitHub pull request. This also results in a new docker container being created which can then be deployed.</p>
+    </div>
+    <div class="mdl-card__actions">
+      <a href="{% url "build.deploy" current_repo.name current_build.number %}" class="mdl-button">{% trans "Deploy Build" %}</a>
+    </div>
+  </div>
+
+  <div class="mdl-card mdl-shadow--2dp">
+    <div class="mdl-card__supporting-text">
+      <h4>Test Jobs</h4>
+      <p>Test jobs are test runs created from a build.</p>
+      <ul>
+        {% for job in current_build.jobs %}
+          <li>
+            <a href="{% url "job.view" current_repo.name current_build.number job.number %}">{{ job.number }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="mdl-card__actions">
+      <a href="{% url "job.start" current_repo.name current_build.number %}" class="mdl-button">{% trans "Start Job" %}</a>
+    </div>
+  </div>
+
+</div>
+<div class="mdl-cell mdl-cell--6-col mdl-shadow--2dp mdl-color--white">
+  {% if current_build.has_build_started %}
   <div id="build-log" data-path="{{ current_build.path.build_log }}"></div>
+  {% endif %}
+  {% if current_build.has_deployment_started %}
   <div id="deploy-log" data-path="{{ current_build.path.deploy_log }}"></div>
-  <a href="{% url "job.start" current_repo.name current_build.number %}">{% trans "Start Job" %}</a>
-  <a href="{% url "build.deploy" current_repo.name current_build.number %}">{% trans "Deploy Build" %}</a>
-  <ul>
-    {% for job in current_build.jobs %}
-      <li>
-        <a href="{% url "job.view" current_repo.name current_build.number job.number %}">{{ job.number }}</a>
-      </li>
-    {% endfor %}
-  </ul>
-  <script type="application/dart" src="{% static "dart/client.dart" %}"></script>
-  <script src="{% static "dart/packages/web_components/webcomponents.min.js" %}"></script>
-  <script src="{% static "dart/packages/web_components/dart_support.js" %}"></script>
-  <script src="{% static "dart/packages/browser/dart.js" %}"></script>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="application/dart" src="{% static "dart/client.dart" %}"></script>
+<script src="{% static "dart/packages/web_components/webcomponents.min.js" %}"></script>
+<script src="{% static "dart/packages/web_components/dart_support.js" %}"></script>
+<script src="{% static "dart/packages/browser/dart.js" %}"></script>
 {% endblock %}

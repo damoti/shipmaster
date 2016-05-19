@@ -9,28 +9,27 @@ import 'package:shelf_exception_response/exception_response.dart';
 import 'tail.dart';
 
 void main() {
-
-  var ws_handler = webSocketHandler((webSocket) {
-    webSocket.listen((message) {
-      var request = JSON.decode(message);
-      // TODO: Dangerously Insecure
-      webSocket.addStream(tail(request['path']));
+    var ws_handler = webSocketHandler((webSocket) {
+        webSocket.listen((message) {
+            var request = JSON.decode(message);
+            // TODO: Dangerously Insecure
+            webSocket.addStream(tail(request['path']));
+            print("tailing: ${request['path']}");
+        });
     });
-  });
 
-  var proxy = proxyHandler("http://localhost:8000");
+    var proxy = proxyHandler("http://localhost:8000");
 
-  var router = route.router()
-      ..get('/logs', ws_handler)
-      ..add('/', ['GET', 'POST'], proxy, exactMatch: false);
+    var router = route.router()
+        ..get('/logs', ws_handler)
+        ..add('/', ['GET', 'POST'], proxy, exactMatch: false);
 
-  var handler = const shelf.Pipeline()
-      .addMiddleware(exceptionResponse())
-      .addMiddleware(shelf.logRequests())
-      .addHandler(router.handler);
+    var handler = const shelf.Pipeline()
+            .addMiddleware(exceptionResponse())
+            .addMiddleware(shelf.logRequests())
+            .addHandler(router.handler);
 
-  io.serve(handler, 'localhost', 8080).then((server) {
-    print('Serving at http://${server.address.host}:${server.port}');
-  });
-
+    io.serve(handler, 'localhost', 8080).then((server) {
+        print('Serving at http://${server.address.host}:${server.port}');
+    });
 }

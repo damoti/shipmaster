@@ -1,15 +1,27 @@
 {% extends "shipmaster/base.html" %}
-{% load i18n %}
+{% load i18n staticfiles %}
 
 {% block content %}
-  <div class="build-log"></div>
-  <script>
-  var build_log = new EventSource("{% url "job.output" current_repo.name current_build.number current_job.number %}");
-  var build_div = document.querySelector('.build-log');
-  build_log.onmessage = function (e) {
-    if (e.data=="closed") build_log.close();
-    build_div.appendChild(document.createTextNode(e.data));
-    build_div.appendChild(document.createElement('br'));
-  };
-  </script>
+
+  <div class="mdl-cell mdl-cell--6-col">
+
+    <div class="mdl-card mdl-shadow--2dp">
+      <div class="mdl-card__supporting-text">
+        <h4>Test Job</h4>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="mdl-cell mdl-cell--6-col mdl-shadow--2dp mdl-color--white">
+    <div id="job-log" data-path="{{ current_job.path.log }}"></div>
+  </div>
+
+{% endblock %}
+
+{% block extra_js %}
+  <script type="application/dart" src="{% static "dart/client.dart" %}"></script>
+  <script src="{% static "dart/packages/web_components/webcomponents.min.js" %}"></script>
+  <script src="{% static "dart/packages/web_components/dart_support.js" %}"></script>
+  <script src="{% static "dart/packages/browser/dart.js" %}"></script>
 {% endblock %}

@@ -16,11 +16,13 @@
   <link rel="stylesheet" href="{% static "material.css" %}">
   <link rel="stylesheet" href="{% static "material-grid.css" %}">
   <link rel="stylesheet" href="{% static "styles.css" %}">
+
 </head>
 
 <body>
-    <div class="demo-layout mdl-layout mdl-js-layout mdl-layout--fixed-drawer mdl-layout--fixed-header">
-      <header class="demo-header mdl-layout__header mdl-color--grey-100 mdl-color-text--grey-600">
+
+    <div class="shipmaster-layout mdl-layout mdl-js-layout mdl-layout--fixed-drawer mdl-layout--fixed-header">
+      <header class="shipmaster-header mdl-layout__header mdl-color--grey-100 mdl-color-text--grey-600">
         <div class="mdl-layout__header-row">
           <span class="mdl-layout-title">Home</span>
           <div class="mdl-layout-spacer"></div>
@@ -43,17 +45,17 @@
           </ul>
         </div>
       </header>
-      <div class="demo-drawer mdl-layout__drawer mdl-color--blue-grey-900 mdl-color-text--blue-grey-50">
-        <header class="demo-drawer-header">
+      <div class="shipmaster-drawer mdl-layout__drawer mdl-color--blue-grey-900 mdl-color-text--blue-grey-50">
+        <header class="shipmaster-drawer-header">
           {% if user.is_authenticated %}
-          <img src="{{ user.avatar }}" class="demo-avatar">
+          <img src="{{ user.avatar }}" class="shipmaster-avatar">
           <span>{{ user.username }}</span>
           {% else %}
-            <img src="{% static "images/user.jpg" %}" class="demo-avatar">
+            <img src="{% static "images/user.jpg" %}" class="shipmaster-avatar">
             <span>Anonymous User</span>
           {% endif %}
         </header>
-        <nav class="demo-navigation mdl-navigation mdl-color--blue-grey-800">
+        <nav class="shipmaster-navigation mdl-navigation mdl-color--blue-grey-800">
           {% for repo in shipmaster.repositories %}
             <a class="mdl-navigation__link {% if repo == current_repo %}mdl-navigation__link--current{% endif %}"
                href="{% url 'repository' repo.name %}">
@@ -83,14 +85,16 @@
         </nav>
       </div>
       <main class="mdl-layout__content mdl-color--grey-100">
-        <div class="mdl-grid demo-content">
-        <div class="demo-graphs mdl-shadow--2dp mdl-color--white mdl-cell mdl-cell--8-col">
-        {% block content %}{% endblock content %}
-        </div>
+        <div class="mdl-grid">
+          {% block content %}{% endblock content %}
         </div>
       </main>
     </div>
+
     <script src="{% static "material.js" %}"></script>
+    {% block extra_js %}
+    {% endblock %}
+
 </body>
 
 </html>

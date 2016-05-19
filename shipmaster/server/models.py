@@ -430,7 +430,8 @@ class Job(YamlModel):
         )
 
     def test(self):
-        Channel("run-test").send({'path': self.path.absolute})
+        from .tasks import test_app
+        test_app.delay(self.path.absolute)
 
     @property
     def has_job_started(self):
