@@ -3,16 +3,7 @@ import re
 import time
 import shutil
 import subprocess
-from random import randint
 from collections import OrderedDict
-
-from channels.channel import Channel
-from django.utils.functional import cached_property
-
-from docker import Client
-from compose.cli.main import filter_containers_to_service_names
-from compose.container import Container
-from compose.cli.log_printer import LogPrinter, build_log_presenters
 from ruamel import yaml
 
 from shipmaster.base.builder import Project
