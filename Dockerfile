@@ -12,6 +12,10 @@ COPY shipmaster /usr/lib/shipmaster/shipmaster
 COPY manage.py setup.py requirements.pip /usr/lib/shipmaster/
 RUN mkdir -p /var/lib/shipmaster/repos
 
+WORKDIR /usr/lib/shipmaster/shipmaster/dart
+RUN pub get
+RUN pub build
+
 WORKDIR /usr/lib/shipmaster
 RUN pip3 install -r requirements.pip
 RUN python3 manage.py migrate
