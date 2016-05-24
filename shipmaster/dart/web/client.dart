@@ -7,7 +7,7 @@ main() {
         DivElement log_div = querySelector('#${log}');
         if (log_div == null) continue;
 
-        var ws = new WebSocket("ws://localhost:8080/logs");
+        var ws = new WebSocket("ws://localhost:8000/logs");
 
         ws.onOpen.first.then((e) {
             ws.sendString(JSON.encode({'path': log_div.dataset['path']}));

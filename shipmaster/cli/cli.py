@@ -25,7 +25,7 @@ def main():
     args = parse_arguments()
     proj = Project(
         ProjectConf.from_workspace(os.getcwd()),
-        debug_ssh_agent=args.debug_ssh_agent,
+        debug_ssh=args.debug_ssh_agent,
         verbose=True,
         log=sys.stdout
     )

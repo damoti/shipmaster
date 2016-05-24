@@ -299,7 +299,7 @@ class Build(YamlModel):
     def get_project(self, log):
         return Project(
             ProjectConf.from_workspace(self.path.workspace),
-            build_num=self.number,
+            build_num=self.number, ssh_config=self.shipmaster.path.ssh_config,
             log=log
         )
 
@@ -417,6 +417,7 @@ class Job(YamlModel):
             ProjectConf.from_workspace(self.build.path.workspace),
             build_num=self.build.number,
             job_num=self.number,
+            ssh_config=self.shipmaster.path.ssh_config,
             log=log
         )
 

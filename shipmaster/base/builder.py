@@ -7,29 +7,49 @@ from .utils import UnbufferedLineIO
 
 class Project:
 
-    def __init__(self, conf: ProjectConf, log, build_num='0', job_num='0', verbose=False, debug_ssh_agent=False):
+    def __init__(self, conf: ProjectConf, log, build_num='0', job_num='0', ssh_config=None, verbose=False, debug_ssh=False):
         self.conf = conf
         self.log = UnbufferedLineIO(log) if not isinstance(log, UnbufferedLineIO) else log
         self.build_num = build_num
         self.job_num = job_num
         self.verbose = verbose
-        self.debug_ssh_agent = debug_ssh_agent
         self.client = Client('unix://var/run/docker.sock')
 
-        self.ssh_auth_filename = os.path.basename(os.environ['SSH_AUTH_SOCK'])
-        self.local_ssh_auth_dir = os.path.dirname(os.environ['SSH_AUTH_SOCK'])
-        self.image_ssh_auth_dir = '/shipmaster/ssh-auth-sock'
+        self.debug_ssh = debug_ssh
+        self.ssh_agent = False
 
-        self.environment = {
-            'SSH_AUTH_SOCK': os.path.join(
-                self.image_ssh_auth_dir,
-                self.ssh_auth_filename
-            )
-        }
+        if ssh_config:
 
-        self.volumes = [
-            '{}:{}'.format(self.local_ssh_auth_dir, self.image_ssh_auth_dir)
-        ]
+            # ssh_config - Server side/django app, uses the ssh_config and deploy keys
+            ssh_dir = os.path.dirname(ssh_config)
+
+            self.environment = {
+                "GIT_SSH_COMMAND": "ssh -F {}".format(ssh_config)
+            }
+
+            self.volumes = [
+                "{0}:{0}".format(ssh_dir)
+            ]
+
+        else:
+
+            # SSH Agent - Local use with shipmaster CLI
+            self.ssh_agent = True
+
+            self.ssh_auth_filename = os.path.basename(os.environ['SSH_AUTH_SOCK'])
+            self.local_ssh_auth_dir = os.path.dirname(os.environ['SSH_AUTH_SOCK'])
+            self.image_ssh_auth_dir = '/shipmaster/ssh-auth-sock'
+
+            self.environment = {
+                "SSH_AUTH_SOCK": os.path.join(
+                    self.image_ssh_auth_dir,
+                    self.ssh_auth_filename
+                )
+            }
+
+            self.volumes = [
+                "{}:{}".format(self.local_ssh_auth_dir, self.image_ssh_auth_dir)
+            ]
 
         self.base = BaseLayer(self, self.conf.base)
         self.app = AppLayer(self, self.conf.app)
@@ -102,7 +122,7 @@ class BaseLayer(LayerBase):
             self.layer.apt_get,
             self.project.conf.ssh.known_hosts,
             self.project.conf.name,
-            self.project.debug_ssh_agent
+            self.project.debug_ssh
         )
         return script
 
