@@ -213,7 +213,10 @@ class AppLayer(LayerBase):
             name=deployed_container_name, working_dir='/app', detach=True,
             volumes=[v.split(':')[1] for v in self.volumes],
             environment=self.environment,
-            host_config=self.project.client.create_host_config(binds=self.volumes)
+            host_config=self.project.client.create_host_config(
+                binds=self.volumes,
+                network_mode='{}_default'.format(self.project.conf.name)
+            )
         )
         client.start(container)
         try:
