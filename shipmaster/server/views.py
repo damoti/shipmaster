@@ -51,7 +51,7 @@ class PullRequest(View):
     def post(self, request, *args, **kwargs):
         repo = request.current_repo
         try:
-            build = Build.create(repo, 'docker')
+            build = Build.create(repo, 'dev')
             build.build()
         except:
             return HttpResponse('FAILED')
