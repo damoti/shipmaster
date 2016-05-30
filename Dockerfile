@@ -10,7 +10,6 @@ RUN mkdir -p /root/.ssh && \
 
 COPY shipmaster /usr/lib/shipmaster/shipmaster
 COPY manage.py setup.py requirements.pip /usr/lib/shipmaster/
-RUN mkdir -p /var/lib/shipmaster/repos
 
 WORKDIR /usr/lib/shipmaster/shipmaster/dart
 RUN pub get
@@ -20,5 +19,5 @@ WORKDIR /usr/lib/shipmaster
 RUN pip3 install -r requirements.pip
 RUN python3 manage.py migrate
 
-EXPOSE 8000
+EXPOSE 8080
 CMD ["/usr/bin/supervisord"]

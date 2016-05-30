@@ -2,12 +2,16 @@ import 'dart:html';
 import 'dart:convert';
 
 main() {
+
+    var protocol = (window.location.protocol == 'https:') ? 'wss:' : 'ws:';
+
     for (var log in ['build-log', 'job-log', 'deploy-log']) {
 
         DivElement log_div = querySelector('#${log}');
         if (log_div == null) continue;
+        if (log_div.dataset.containsKey('finished')) continue;
 
-        var ws = new WebSocket("ws://localhost:8000/logs");
+        var ws = new WebSocket("${protocol}//${window.location.host}/logs");
 
         ws.onOpen.first.then((e) {
             ws.sendString(JSON.encode({'path': log_div.dataset['path']}));
@@ -16,5 +20,6 @@ main() {
         ws.onMessage.listen((event) {
             log_div.appendHtml(event.data + '<br />');
         });
+
     }
 }

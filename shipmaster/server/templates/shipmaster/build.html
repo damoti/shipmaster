@@ -20,7 +20,7 @@
       <h4>Test Jobs</h4>
       <p>Test jobs are test runs created from a build.</p>
       <ul>
-        {% for job in current_build.jobs %}
+        {% for job in current_build.sorted_jobs %}
           <li>
             <a href="{% url "job.view" current_repo.name current_build.number job.number %}">{{ job.number }}</a>
           </li>
@@ -34,12 +34,31 @@
 
 </div>
 <div class="mdl-cell mdl-cell--6-col mdl-shadow--2dp mdl-color--white">
+
   {% if current_build.has_build_started %}
-  <div id="build-log" data-path="{{ current_build.path.build_log }}"></div>
+  <div id="build-log"
+       data-path="{{ current_build.path.build_log }}"
+       {% if current_build.has_build_finished %}
+       data-finished="{{ current_build.build_time }}"
+       {% endif %}>
+  {% if current_build.has_build_finished %}
+    {{ current_build.formatted_build_log|linebreaksbr }}
   {% endif %}
+  </div>
+  {% endif %}
+
   {% if current_build.has_deployment_started %}
-  <div id="deploy-log" data-path="{{ current_build.path.deploy_log }}"></div>
+  <div id="deploy-log"
+       data-path="{{ current_build.path.deployment_log }}"
+       {% if current_build.has_deployment_finished %}
+       data-finished="{{ current_build.deployment_time }}"
+       {% endif %}>
+  {% if current_build.has_deployment_finished %}
+    {{ current_build.formatted_deployment_log|linebreaksbr }}
   {% endif %}
+  </div>
+  {% endif %}
+
 </div>
 {% endblock %}
 

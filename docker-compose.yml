@@ -8,4 +8,3 @@ services:
     volumes:
       - /var/lib/shipmaster:/var/lib/shipmaster
       - /var/run/docker.sock:/var/run/docker.sock
-

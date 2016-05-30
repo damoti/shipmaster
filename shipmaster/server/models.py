@@ -194,9 +194,14 @@ class Repository(YamlModel):
 
         return repo
 
+    @property
     def builds(self):
         for build in os.listdir(self.path.builds):
             yield Build.load(self, build)
+
+    @property
+    def sorted_builds(self):
+        return sorted(self.builds, key=lambda build: int(build.number), reverse=True)
 
     def __eq__(self, other):
         assert isinstance(other, Repository)
@@ -303,9 +308,14 @@ class Build(YamlModel):
             log=log
         )
 
+    @property
     def jobs(self):
         for job in os.listdir(self.path.jobs):
             yield Job.load(self, job)
+
+    @property
+    def sorted_jobs(self):
+        return sorted(self.jobs, key=lambda job: int(job.number), reverse=True)
 
     def build(self):
         from .tasks import build_app
@@ -316,6 +326,8 @@ class Build(YamlModel):
         deploy_app.delay(self.path.absolute)
 
     # Timers & Progress
+
+    # Repository Cloning
 
     @property
     def has_cloning_started(self):
@@ -333,6 +345,8 @@ class Build(YamlModel):
         assert not self.has_cloning_finished
         record_time(self.path.clone_end)
 
+    # App Build
+
     @property
     def has_build_started(self):
         return os.path.exists(self.path.build_begin)
@@ -340,6 +354,17 @@ class Build(YamlModel):
     @property
     def has_build_finished(self):
         return os.path.exists(self.path.build_end)
+
+    @property
+    def build_time(self):
+        assert self.has_build_finished
+        return get_time_elapsed(self.path.build_begin, self.path.build_end)
+
+    @property
+    def formatted_build_log(self):
+        assert self.has_build_finished
+        with open(self.path.build_log, 'r') as log_file:
+            return log_file.read()
 
     def build_started(self):
         assert not self.has_build_started
@@ -349,6 +374,8 @@ class Build(YamlModel):
         assert not self.has_build_finished
         record_time(self.path.build_end)
 
+    # App Deployment
+
     @property
     def has_deployment_started(self):
         return os.path.exists(self.path.deployment_begin)
@@ -356,6 +383,17 @@ class Build(YamlModel):
     @property
     def has_deployment_finished(self):
         return os.path.exists(self.path.deployment_end)
+
+    @property
+    def deployment_time(self):
+        assert self.has_deployment_finished
+        return get_time_elapsed(self.path.deployment_begin, self.path.deployment_end)
+
+    @property
+    def formatted_deployment_log(self):
+        assert self.has_deployment_finished
+        with open(self.path.deployment_log, 'r') as log_file:
+            return log_file.read()
 
     def deployment_started(self):
         assert not self.has_deployment_started

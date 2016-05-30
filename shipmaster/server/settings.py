@@ -127,6 +127,6 @@ STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
     ('', 'shipmaster/server/static'),
-    #('dart', 'shipmaster/dart/build/web')
-    ('dart', 'shipmaster/dart/web')
+    ('dart', 'shipmaster/dart/build/web')
+    #('dart', 'shipmaster/dart/web')
 ]

@@ -1,5 +1,6 @@
 import os
 from docker import Client
+from requests.exceptions import ReadTimeout
 from .config import ProjectConf, LayerConf
 from .script import Archive, Script, APP_PATH
 from .utils import UnbufferedLineIO
@@ -171,38 +172,41 @@ class AppLayer(LayerBase):
 
     def deploy(self):
 
+        environment = "sandbox"
+
         client = self.project.client
         log = self.log
 
-        deployed_container_name = "{}_dev".format(self.layer.repository.replace('/', '_'))
+        deployed_container_name = "{}_{}".format(self.layer.repository.replace('/', '_'), environment)
 
         log.write("Deploying: {} as {}".format(self.image_name, deployed_container_name))
 
-        # Remove existing dev
+        # Remove existing container
         if client.containers(all=True, filters={'name': deployed_container_name}):
             log.write("Stopping existing container.")
             client.stop(deployed_container_name)
             log.write("Removing existing container.")
             client.remove_container(deployed_container_name)
 
-        # Pre-deployment script
+        # Run migrations/scripts to prep environment for this deployment
         archive = Archive(self.project.conf.workspace, log)
         script = Script('pre_deploy_script.sh')
         script.write("cd /app")
-        #script.write("fab copyproductiontodev")
-        #script.write("python3 manage.py migrate")
         archive.add_script(script)
         log.write("Running pre-deployment script.")
         container = self.project.client.create_container(
             self.image_name, command=['/bin/sh', '-c', script.path],
             volumes=[v.split(':')[1] for v in self.volumes],
             environment=self.environment,
-            host_config=self.project.client.create_host_config(binds=self.volumes)
+            host_config=self.project.client.create_host_config(
+                binds=self.volumes,
+                network_mode='{}_default'.format(self.project.conf.name)
+            )
         )
         client.put_archive(container, '/', archive.getfile())
         client.start(container)
         log.write("Waiting.")
-        client.wait(container, 60*5)  # Timeout if not finished after 5 minutes
+        client.wait(container, 60*15)  # Timeout if not finished after 15 minutes
         log.write(client.logs(container).decode(), newline=False)
         client.remove_container(container)
 
@@ -221,6 +225,11 @@ class AppLayer(LayerBase):
         client.start(container)
         try:
             client.wait(container, 5)
+        except ReadTimeout:
+            # timeout exception expected since the process is not
+            # supposed to finish under normal conditions
+            # we wait 5 secs for the purpose of collecting some log output
+            pass
         finally:
             log.write(client.logs(container).decode(), newline=False)
 
