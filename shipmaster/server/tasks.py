@@ -1,6 +1,8 @@
 import os
+import logging
 import subprocess
-from .models import Build, Job
+from docker.errors import APIError
+from .models import Build, Job, Infrastructure
 from ..base.utils import UnbufferedLineIO
 from celery import shared_task
 
@@ -44,7 +46,7 @@ def build_app(path):
 
 
 @shared_task
-def deploy_app(path):
+def deploy_app(path, service):
 
     build = Build.from_path(path)
 
@@ -57,8 +59,14 @@ def deploy_app(path):
         project = build.get_project(log)
 
         build.deployment_started()
-        project.app.deploy()
-        build.deployment_finished()
+        try:
+            project.app.deploy(build.shipmaster.infrastructure.compose, service)
+        except APIError as e:
+            print(e.explanation)
+            log.write(e.explanation.decode())
+            raise
+        finally:
+            build.deployment_finished()
 
 
 @shared_task
@@ -71,3 +79,26 @@ def test_app(path):
         project.test.build()
         job.job_finished()
 
+
+@shared_task
+def sync_infrastructure(path):
+
+    infra = Infrastructure.from_path(path)
+
+    assert not infra.is_checkout_running
+
+    with open(infra.path.git_log, 'w') as buffered:
+
+        log = UnbufferedLineIO(buffered)
+
+        git_ssh_command = {"GIT_SSH_COMMAND": "ssh -F {}".format(infra.shipmaster.path.ssh_config)}
+
+        infra.checkout_started()
+        try:
+            if os.path.exists(infra.path.src):
+                run(["git", "pull"], cwd=infra.path.src, log=log, env=git_ssh_command)
+            else:
+                run(["git", "clone", infra.project_git, infra.path.src],
+                    log=log, env=git_ssh_command)
+        finally:
+            infra.checkout_finished()

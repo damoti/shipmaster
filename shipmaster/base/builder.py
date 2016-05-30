@@ -1,5 +1,8 @@
 import os
 from docker import Client
+from compose.service import Service
+from compose.service import Container
+from compose.project import Project as ComposeProject
 from requests.exceptions import ReadTimeout
 from .config import ProjectConf, LayerConf
 from .script import Archive, Script, APP_PATH
@@ -170,68 +173,59 @@ class AppLayer(LayerBase):
 
         self.start_and_commit(self.create(script))
 
-    def deploy(self):
-
-        environment = "sandbox"
-
-        client = self.project.client
+    def deploy(self, compose: ComposeProject, service_name):
         log = self.log
 
-        deployed_container_name = "{}_{}".format(self.layer.repository.replace('/', '_'), environment)
+        # Make sure the custom network is up
+        compose.initialize()
 
-        log.write("Deploying: {} as {}".format(self.image_name, deployed_container_name))
+        service = compose.get_service(service_name)  # type: Service
 
-        # Remove existing container
-        if client.containers(all=True, filters={'name': deployed_container_name}):
-            log.write("Stopping existing container.")
-            client.stop(deployed_container_name)
-            log.write("Removing existing container.")
-            client.remove_container(deployed_container_name)
+        # 1. Tag the new image with what docker-compose is expecting.
+        image_name, tag = service.image_name.split(':')
+        log.write("Tagging: {} -> {}:{}".format(self.image_name, image_name, tag))
+        service.client.tag(self.image_name, image_name, tag)
 
-        # Run migrations/scripts to prep environment for this deployment
+        # 2. Stop and remove the existing container(s).
+        for c in service.containers():  # type: Container
+            log.write("Stopping: {}".format(c.name))
+            c.stop(timeout=30)
+            c.remove()
+
+        # 3. Run upgrade/migration scripts to prep environment for this deployment.
+        log.write("Running Pre-Deploy Script / Migrations")
+
+        #   a. Create upgrade script.
         archive = Archive(self.project.conf.workspace, log)
         script = Script('pre_deploy_script.sh')
         script.write("cd /app")
         archive.add_script(script)
-        log.write("Running pre-deployment script.")
-        container = self.project.client.create_container(
-            self.image_name, command=['/bin/sh', '-c', script.path],
-            volumes=[v.split(':')[1] for v in self.volumes],
-            environment=self.environment,
-            host_config=self.project.client.create_host_config(
-                binds=self.volumes,
-                network_mode='{}_default'.format(self.project.conf.name)
-            )
-        )
-        client.put_archive(container, '/', archive.getfile())
-        client.start(container)
-        log.write("Waiting.")
-        client.wait(container, 60*15)  # Timeout if not finished after 15 minutes
-        log.write(client.logs(container).decode(), newline=False)
-        client.remove_container(container)
 
-        # Deploy App container
-        self.log.write("Starting new container.")
-        container = self.project.client.create_container(
-            self.image_name, command=['/bin/sh', '-c', 'python3 manage.py runserver 0.0.0.0:8000'],
-            name=deployed_container_name, working_dir='/app', detach=True,
-            volumes=[v.split(':')[1] for v in self.volumes],
-            environment=self.environment,
-            host_config=self.project.client.create_host_config(
-                binds=self.volumes,
-                network_mode='{}_default'.format(self.project.conf.name)
-            )
-        )
-        client.start(container)
+        #   b. Create one-off container to run upgrade script.
+        container = service.create_container(one_off=True, command=['/bin/sh', '-c', script.path])
+        service.client.put_archive(container.id, '/', archive.getfile())
+
+        #   c. Run upgrade script.
+        service.start_container(container)
+        log.write("Waiting.")
+        service.client.wait(container.id, 60*15)  # Timeout if not finished after 15 minutes
+        log.write(container.logs().decode(), newline=False)
+        container.remove()
+
+        # 4. Deploy
+
+        container = service.create_container()
+        log.write("Starting: {}".format(container.id))
+        service.start_container(container)
         try:
-            client.wait(container, 5)
+            service.client.wait(container.id, 10)
         except ReadTimeout:
             # timeout exception expected since the process is not
             # supposed to finish under normal conditions
-            # we wait 5 secs for the purpose of collecting some log output
+            # we wait 10 secs for the purpose of collecting some log output
             pass
         finally:
-            log.write(client.logs(container).decode(), newline=False)
+            log.write(container.logs().decode(), newline=False)
 
 
 class TestLayer(LayerBase):

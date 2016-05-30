@@ -6,6 +6,9 @@ import subprocess
 from collections import OrderedDict
 from ruamel import yaml
 
+from compose.cli.command import get_project
+from compose.config import config as compose_config
+
 from shipmaster.base.builder import Project
 from shipmaster.base.config import ProjectConf
 
@@ -90,6 +93,11 @@ class Shipmaster:
         for repo_name in os.listdir(self.path.repos_dir):
             yield Repository.load(self, repo_name)
 
+    @property
+    def infrastructure(self):
+        if Infrastructure(self).exists():
+            return Infrastructure.load(self)
+
 
 class RepositoryPath(YamlPath):
 
@@ -172,6 +180,13 @@ class Repository(YamlModel):
     def public_key(self):
         return open(self.path.public_key, 'r').read()
 
+    def exists(self):
+        return os.path.exists(self.path.absolute)
+
+    @property
+    def is_infrastructure(self):
+        return False
+
     @classmethod
     def create(cls, shipmaster, name, git):
         repo = cls(shipmaster, name, git=git)
@@ -181,7 +196,8 @@ class Repository(YamlModel):
             os.mkdir(shipmaster.path.repos_dir)
 
         os.mkdir(repo.path.absolute)
-        os.mkdir(repo.path.builds)
+        if not repo.is_infrastructure:
+            os.mkdir(repo.path.builds)
         try:
             keygen = "ssh-keygen -q -b 4096 -t rsa -N '' -f {}".format(repo.path.private_key)
             subprocess.check_output(keygen, shell=True, stderr=subprocess.STDOUT)
@@ -206,6 +222,87 @@ class Repository(YamlModel):
     def __eq__(self, other):
         assert isinstance(other, Repository)
         return self.name == other.name
+
+
+class InfrastructurePath(RepositoryPath):
+
+    @property
+    def src(self):
+        return os.path.join(self.absolute, 'src')
+
+    @property
+    def checkout_running(self):
+        return os.path.join(self.absolute, 'checkout.running')
+
+    @property
+    def git_log(self):
+        return os.path.join(self.absolute, 'git.log')
+
+
+class Infrastructure(Repository):
+
+    parent_class = Shipmaster
+
+    def __init__(self, shipmaster, name=None, **kwargs):
+        super().__init__(shipmaster, 'infrastructure', **kwargs)
+        self.path = InfrastructurePath(shipmaster, self.name)
+        self.compose = None
+        if os.path.exists(self.path.src):
+            self.compose = get_project(self.path.src, host='unix://var/run/docker.sock')
+
+    @classmethod
+    def load(cls, parent, name=None):
+        return super().load(parent, 'infrastructure')  # type: Infrastructure
+
+    @property
+    def is_infrastructure(self):
+        return True
+
+    def sync(self):
+        from .tasks import sync_infrastructure
+        sync_infrastructure.delay(self.path.absolute)
+
+    def checkout_started(self):
+        assert not self.is_checkout_running
+        record_time(self.path.checkout_running)
+
+    def checkout_finished(self):
+        assert self.is_checkout_running
+        os.remove(self.path.checkout_running)
+
+    @property
+    def is_checkout_running(self):
+        return os.path.exists(self.path.checkout_running)
+
+    @property
+    def has_log(self):
+        return os.path.exists(self.path.git_log)
+
+    @property
+    def is_log_finished(self):
+        if self.has_log and not self.is_checkout_running:
+            return True
+        return False
+
+    @property
+    def formatted_checkout_log(self):
+        assert self.is_log_finished
+        with open(self.path.git_log, 'r') as log_file:
+            return log_file.read()
+
+    # Compose
+
+    def formatted_compose_config(self):
+        return ''
+
+    def get_deploy_services(self):
+        if not self.compose:
+            return []
+        return [
+            service.name
+            for service in self.compose.services
+            if 'io.shipmaster.deploy' in service.options.get('labels', {})
+        ]
 
 
 class BuildPath(YamlPath):
@@ -321,9 +418,9 @@ class Build(YamlModel):
         from .tasks import build_app
         build_app.delay(self.path.absolute)
 
-    def deploy(self):
+    def deploy(self, service):
         from .tasks import deploy_app
-        deploy_app.delay(self.path.absolute)
+        deploy_app.delay(self.path.absolute, service)
 
     # Timers & Progress
 

@@ -11,7 +11,9 @@
       <p>A build is created in response to a GitHub pull request. This also results in a new docker container being created which can then be deployed.</p>
     </div>
     <div class="mdl-card__actions">
-      <a href="{% url "build.deploy" current_repo.name current_build.number %}" class="mdl-button">{% trans "Deploy Build" %}</a>
+      {% for deploy in infrastructure.get_deploy_services %}
+        <a href="{% url "build.deploy" current_repo.name current_build.number deploy %}" class="mdl-button">{% trans "Deploy" %} {{ deploy }}</a>
+      {% endfor %}
     </div>
   </div>
 

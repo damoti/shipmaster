@@ -7,24 +7,33 @@
 
     <div class="mdl-card mdl-shadow--2dp">
       <div class="mdl-card__supporting-text">
-        <h4>Pull & Build</h4>
-        <p>Pull the latest source from {{ current_repo.git }} and kick off a build.</p>
+        <h4>Infrastructure</h4>
+        <p>Pull the latest source from {{ infrastructure.git }} to update your infrastructure configuration.</p>
       </div>
       <div class="mdl-card__actions">
-        <a href="{% url "repository.pull" current_repo.name %}" class="mdl-button">{% trans "Start Build" %}</a>
+        <a href="{% url "repository.pull" infrastructure.name %}" class="mdl-button">{% trans "Update" %}</a>
       </div>
     </div>
 
     <div class="mdl-card mdl-shadow--2dp">
       <div class="mdl-card__supporting-text">
-        <h4>Builds</h4>
-        <p>Previous builds:</p>
-        <ul>
-          {% for build in current_repo.sorted_builds %}
-            <li><a href="{% url "build.view" current_repo.name build.number %}">Build #{{ build.number }}</a></li>
-          {% endfor %}
-        </ul>
+        <h4>Git Output</h4>
+        {% if infrastructure.has_log %}
+        <div id="build-log"
+          data-path="{{ infrastructure.path.git_log }}"
+          {% if infrastructure.is_log_finished %}data-finished="yes"{% endif %}>
+          {% if infrastructure.is_log_finished %}
+            {{ infrastructure.formatted_checkout_log|linebreaksbr }}
+          {% endif %}
+        </div>
+        {% endif %}
       </div>
     </div>
+
   </div>
+
+  <div class="mdl-cell mdl-cell--6-col mdl-shadow--2dp mdl-color--white">
+    <pre>{{ infrastructure.formatted_compose_config }}</pre>
+  </div>
+
 {% endblock %}

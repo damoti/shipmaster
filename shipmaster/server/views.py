@@ -24,7 +24,7 @@ class Dashboard(TemplateView):
         return context
 
 
-class ViewRepository(TemplateView):
+class ViewCodeRepository(TemplateView):
     template_name = "shipmaster/repository.html"
 
     def get_context_data(self, **kwargs):
@@ -32,13 +32,37 @@ class ViewRepository(TemplateView):
         return context
 
 
+class ViewInfrastructureRepository(TemplateView):
+    template_name = "shipmaster/infrastructure.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data()
+        return context
+
+
+class ViewRepository(View):
+    def dispatch(self, request, *args, **kwargs):
+        if self.request.current_repo.is_infrastructure:
+            view = ViewInfrastructureRepository.as_view()
+        else:
+            view = ViewCodeRepository.as_view()
+        return view(request, *args, **kwargs)
+
+
 class CreateRepository(FormView):
     template_name = "shipmaster/repository_form.html"
     form_class = RepositoryForm
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.update({
+            'shipmaster': self.request.shipmaster
+        })
+        return kwargs
+
     def form_valid(self, form):
         try:
-            repo = Repository.create(**form.cleaned_data)
+            repo = Repository.create(shipmaster=self.request.shipmaster, **form.cleaned_data)
         except CalledProcessError as err:
             form.add_error(None, err.output)
             return super().form_invalid(form)
@@ -48,21 +72,26 @@ class CreateRepository(FormView):
 
 class PullRequest(View):
 
+    def pull(self, repo):
+        if repo.is_infrastructure:
+            repo.sync()
+            return HttpResponseRedirect(reverse('repository', args=[repo.name]))
+        else:
+            build = Build.create(repo, 'dev')
+            build.build()
+            return HttpResponseRedirect(reverse('build.view', args=[repo.name, build.number]))
+
     def post(self, request, *args, **kwargs):
         repo = request.current_repo
         try:
-            build = Build.create(repo, 'dev')
-            build.build()
+            self.pull(repo)
         except:
             return HttpResponse('FAILED')
         else:
             return HttpResponse('OK')
 
     def get(self, request, *args, **kwargs):
-        repo = request.current_repo
-        build = Build.create(repo, 'docker')
-        build.build()
-        return HttpResponseRedirect(reverse('build.view', args=[repo.name, build.number]))
+        return self.pull(request.current_repo)
 
 
 class ViewBuild(TemplateView):
@@ -122,7 +151,7 @@ class DeployBuild(View):
     def get(self, request, *args, **kwargs):
         repo = request.current_repo
         build = request.current_build
-        build.deploy()
+        build.deploy(kwargs['service'])
         return HttpResponseRedirect(reverse('build.view', args=[repo.name, build.number]))
 
 
