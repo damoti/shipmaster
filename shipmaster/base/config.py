@@ -23,10 +23,8 @@ class ProjectConf:
         self.base = LayerConf(self, 'base', layers.get('base', {}))
         self.app = LayerConf(self, 'app', layers.get('app', {}))
         self.test = LayerConf(self, 'test', layers.get('test', {}))
-        self.dev = LayerConf(self, 'dev', layers.get('dev', {}))
 
         self.ssh = SSHConf(self, conf_dict.get('ssh', {}))
-        self.services = ServicesConf(self, conf_dict.get('services', {}))
 
 
 class LayerConf:
@@ -36,10 +34,16 @@ class LayerConf:
         self.from_image = layer.get('from')
         if name == 'base' and not self.from_image:
             raise AttributeError("'base' layer must have 'from' attribute")
-        self.command = layer.get('command')
+        self.build = layer.get('build', [])
+        if type(self.build) is str:
+            self.build = [self.build]
+        self.prepare = layer.get('prepare', [])
+        if type(self.prepare) is str:
+            self.prepare = [self.prepare]
+        self.start = layer.get('start')
+        self.wait_for = layer.get('wait-for')
         self.apt_get = layer.get('apt-get', [])
         self.context = layer.get('context', [])
-        self.script = layer.get('script', [])
         self.volumes = layer.get('volumes', [])
         self.environment = layer.get('environment', {})
 
@@ -48,35 +52,3 @@ class SSHConf:
     def __init__(self, conf, ssh):
         self.conf = conf
         self.known_hosts = ssh.get('known_hosts', [])
-
-
-class ServicesConf:
-
-    def __init__(self, conf, services):
-        self.conf = conf
-        self.services = services
-
-        #services['app'].update({
-        #    'image': conf.active_layer.repository,
-        #    'working_dir': '/app',
-        #    'command': conf.active_layer.command
-        #})
-        #if conf.active_layer.name == 'test':
-        #    services['app'].pop('ports', None)
-        self.volumes = services['app'].setdefault('volumes', [])
-        self.environment = services['app'].setdefault('environment', {})
-
-    @property
-    def names(self):
-        return list(self.services.keys())
-
-    @property
-    def compose(self):
-        config_file = compose_config.ConfigFile('.shipmaster.yaml', {
-            'version': '2',
-            'services': self.services
-        })
-        env = compose_config.Environment()
-        env.update(os.environ.copy())
-        config_details = compose_config.ConfigDetails(os.getcwd(), [config_file], env)
-        return compose_config.load(config_details)

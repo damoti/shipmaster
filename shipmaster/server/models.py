@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import time
 import shutil
 import subprocess
@@ -402,7 +403,7 @@ class Build(YamlModel):
         return Project(
             ProjectConf.from_workspace(self.path.workspace),
             build_num=self.number, ssh_config=self.shipmaster.path.ssh_config,
-            log=log
+            log=log, commit_info=self.commit_info
         )
 
     @property
@@ -423,6 +424,18 @@ class Build(YamlModel):
         deploy_app.delay(self.path.absolute, service)
 
     # Timers & Progress
+
+    @property
+    def commit_info(self):
+        details_cmnd = ["git", "log", '--format={"hash": "%H", "short-hash": "%h", "author": "%an", "email": "%ae"}', "-n", "1"]
+        result = subprocess.run(details_cmnd, cwd=self.path.workspace, stdout=subprocess.PIPE)
+        json_result = result.stdout.decode().strip()
+        info = json.loads(json_result)
+        subject_cmnd = ["git", "log", '--format=%s', "-n", "1"]
+        result = subprocess.run(subject_cmnd, cwd=self.path.workspace, stdout=subprocess.PIPE)
+        info['subject'] = result.stdout.decode().strip()
+        info['branch'] = self.branch
+        return info
 
     # Repository Cloning
 
