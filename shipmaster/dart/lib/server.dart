@@ -29,7 +29,7 @@ void main() {
             .addMiddleware(shelf.logRequests())
             .addHandler(router.handler);
 
-    io.serve(handler, 'localhost', 8080).then((server) {
+    io.serve(handler, '0.0.0.0', 8080).then((server) {
         print('Serving at http://${server.address.host}:${server.port}');
     });
 }
