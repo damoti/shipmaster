@@ -3,6 +3,16 @@ import os
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
+import asgi_ipc
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "asgi_ipc.IPCChannelLayer",
+        "ROUTING": "shipmaster.server.routing.channel_routing",
+        "CONFIG": {
+            "prefix": "shipmaster",
+        },
+    },
+}
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -33,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'bootstrapform',
+    'channels',
     'shipmaster.server'
 ]
 
@@ -127,6 +138,6 @@ STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
     ('', 'shipmaster/server/static'),
-    ('dart', 'shipmaster/dart/build/web')
-    #('dart', 'shipmaster/dart/web')
+    #('dart', 'shipmaster/dart/build/web')
+    ('dart', 'shipmaster/dart/web')
 ]

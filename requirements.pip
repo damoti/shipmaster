@@ -1,4 +1,5 @@
 django
+channels
 django-bootstrap-form
 requests_oauthlib
 celery
