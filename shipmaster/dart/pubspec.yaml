@@ -1,9 +1,3 @@
 name: shipmaster
 dependencies:
-  browser: any
   web_components: any
-  shelf: any
-  shelf_route: any
-  shelf_proxy: any
-  shelf_web_socket: any
-  shelf_exception_response: any

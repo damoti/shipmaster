@@ -20,8 +20,6 @@
 {% endblock %}
 
 {% block extra_js %}
+  <script src="{% static "dart/packages/web_components/webcomponents-lite.min.js" %}"></script>
   <script type="application/dart" src="{% static "dart/client.dart" %}"></script>
-  <script src="{% static "dart/packages/web_components/webcomponents.min.js" %}"></script>
-  <script src="{% static "dart/packages/web_components/dart_support.js" %}"></script>
-  <script src="{% static "dart/packages/browser/dart.js" %}"></script>
 {% endblock %}

@@ -1,13 +1,14 @@
 from django.contrib import auth
 from django.contrib.auth import load_backend
 from django.core.exceptions import ImproperlyConfigured
-from .models import Shipmaster, Repository, Infrastructure, Build, Job
+from .models import Shipmaster, Repository, Build, Deployment, Test
 from .auth import AccessTokenUserBackend
 
 
 class ShipmasterMiddleware:
 
-    def process_view(self, request, view, args, kwargs):
+    @staticmethod
+    def process_view(request, view, args, kwargs):
         request.shipmaster = Shipmaster('/var/lib/shipmaster')
         request.infrastructure = request.shipmaster.infrastructure
         request.current_repo = None
@@ -20,10 +21,13 @@ class ShipmasterMiddleware:
                 request.current_repo = Repository.load(request.shipmaster, kwargs['repo'])
             if 'build' in kwargs:
                 request.current_build = Build.load(request.current_repo, kwargs['build'])
-                if 'job' in kwargs:
-                    request.current_job = Job.load(request.current_build, kwargs['job'])
+                if 'test' in kwargs:
+                    request.current_job = Test.load(request.current_build, kwargs['test'])
+                if 'deployment' in kwargs:
+                    request.current_job = Deployment.load(request.current_build, kwargs['deployment'])
 
-    def process_template_response(self, request, response):
+    @staticmethod
+    def process_template_response(request, response):
         if hasattr(response, 'context_data'):
             response.context_data['shipmaster'] = request.shipmaster
             response.context_data['infrastructure'] = request.infrastructure

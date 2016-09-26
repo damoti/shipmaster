@@ -7,66 +7,64 @@
 
   <div class="mdl-card mdl-shadow--2dp">
     <div class="mdl-card__supporting-text">
-      <h4>Build</h4>
+      <h4>Build #{{ current_build.number }}</h4>
       <p>A build is created in response to a GitHub pull request. This also results in a new docker container being created which can then be deployed.</p>
-    </div>
-    <div class="mdl-card__actions">
-      {% for deploy in infrastructure.get_deploy_services %}
-        <a href="{% url "build.deploy" current_repo.name current_build.number deploy %}" class="mdl-button">{% trans "Deploy" %} {{ deploy }}</a>
-      {% endfor %}
     </div>
   </div>
 
   <div class="mdl-card mdl-shadow--2dp">
     <div class="mdl-card__supporting-text">
-      <h4>Test Jobs</h4>
-      <p>Test jobs are test runs created from a build.</p>
+      <h4>Test</h4>
+      <p>Test runs against this build.</p>
       <ul>
-        {% for job in current_build.sorted_jobs %}
+        {% for job in current_build.sorted_tests %}
           <li>
-            <a href="{% url "job.view" current_repo.name current_build.number job.number %}">{{ job.number }}</a>
+            <a href="{% url "test" current_repo.name current_build.number job.number %}">{{ job.number }}</a>
           </li>
         {% endfor %}
       </ul>
     </div>
     <div class="mdl-card__actions">
-      <a href="{% url "job.start" current_repo.name current_build.number %}" class="mdl-button">{% trans "Start Job" %}</a>
+      <a href="{% url "test.start" current_repo.name current_build.number %}" class="mdl-button">{% trans "Start Test" %}</a>
+    </div>
+  </div>
+
+  <div class="mdl-card mdl-shadow--2dp">
+    <div class="mdl-card__supporting-text">
+      <h4>Deploy</h4>
+      <p>Deployments initiated with this build.</p>
+      <ul>
+        {% for deployment in current_build.sorted_deployments %}
+          <li>
+            <a href="{% url "deployment" current_repo.name current_build.number deployment.number %}">Deployment #{{ deployment.number }} to {{ deployment.destination }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="mdl-card__actions">
+      {% for destination in infrastructure.get_deploy_destinations %}
+        <a href="{% url "deployment.start" current_repo.name current_build.number destination %}" class="mdl-button">{% trans "Deploy" %} {{ destination }}</a>
+      {% endfor %}
     </div>
   </div>
 
 </div>
 <div class="mdl-cell mdl-cell--6-col mdl-shadow--2dp mdl-color--white">
 
-  {% if current_build.has_build_started %}
-  <div id="build-log"
-       data-path="{{ current_build.path.build_log }}"
-       {% if current_build.has_build_finished %}
-       data-finished="{{ current_build.build_time }}"
-       {% endif %}>
-  {% if current_build.has_build_finished %}
-    {{ current_build.formatted_build_log|linebreaksbr }}
-  {% endif %}
+  <div id="log-output"
+     data-path="{{ current_build.path.log }}"
+     {% if current_build.has_build_finished %}
+     data-finished="{{ current_build.elapsed_time }}"
+     {% endif %}>
+    {% if current_build.has_build_finished %}
+      {{ current_build.log|linebreaksbr }}
+    {% endif %}
   </div>
-  {% endif %}
-
-  {% if current_build.has_deployment_started %}
-  <div id="deploy-log"
-       data-path="{{ current_build.path.deployment_log }}"
-       {% if current_build.has_deployment_finished %}
-       data-finished="{{ current_build.deployment_time }}"
-       {% endif %}>
-  {% if current_build.has_deployment_finished %}
-    {{ current_build.formatted_deployment_log|linebreaksbr }}
-  {% endif %}
-  </div>
-  {% endif %}
 
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script type="application/dart" src="{% static "dart/client.dart" %}"></script>
-<script src="{% static "dart/packages/web_components/webcomponents.min.js" %}"></script>
-<script src="{% static "dart/packages/web_components/dart_support.js" %}"></script>
-<script src="{% static "dart/packages/browser/dart.js" %}"></script>
+  <script src="{% static "dart/packages/web_components/webcomponents-lite.min.js" %}"></script>
+  <script type="application/dart" src="{% static "dart/client.dart" %}"></script>
 {% endblock %}

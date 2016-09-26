@@ -64,15 +64,20 @@
             </a>
             {% if repo == current_repo and current_build != None %}
               <a class="mdl-navigation__link mdl-navigation__link--current"
-                 href="{% url 'build.view' repo.name current_build.number %}">
+                 href="{% url 'build' repo.name current_build.number %}">
                 <i class="mdl-color-text--blue-grey-400 material-icons" role="presentation">build</i>
                 Build# {{ current_build.number }}
               </a>
               {% if current_job != None %}
                 <a class="mdl-navigation__link mdl-navigation__link--current"
-                   href="{% url 'job.view' repo.name current_build.number current_job.number %}">
-                  <i class="mdl-color-text--blue-grey-400 material-icons" role="presentation">directions_run</i>
-                  Job# {{ current_job.number }}
+                   href="{% url current_job.type_name repo.name current_build.number current_job.number %}">
+                  {% if current_job.is_test %}
+                    <i class="mdl-color-text--blue-grey-400 material-icons" role="presentation">directions_run</i>
+                    Test# {{ current_job.number }}
+                  {% elif current_job.is_deployment %}
+                    <i class="mdl-color-text--blue-grey-400 material-icons" role="presentation">directions_run</i>
+                    Deployment# {{ current_job.number }}
+                  {% endif %}
                 </a>
               {% endif %}
             {% endif %}

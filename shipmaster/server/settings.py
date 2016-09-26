@@ -3,7 +3,6 @@ import os
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
-import asgi_ipc
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "asgi_ipc.IPCChannelLayer",

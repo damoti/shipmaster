@@ -262,6 +262,7 @@ class Infrastructure(Repository):
     def sync(self):
         from .tasks import sync_infrastructure
         sync_infrastructure.delay(self.path.absolute)
+        return self
 
     def checkout_started(self):
         assert not self.is_checkout_running
@@ -296,7 +297,7 @@ class Infrastructure(Repository):
     def formatted_compose_config(self):
         return ''
 
-    def get_deploy_services(self):
+    def get_deploy_destinations(self):
         if not self.compose:
             return []
         return [
@@ -333,20 +334,8 @@ class BuildPath(YamlPath):
         return os.path.join(self.absolute, 'build.end')
 
     @property
-    def build_log(self):
+    def log(self):
         return os.path.join(self.absolute, 'build.log')
-
-    @property
-    def deployment_begin(self):
-        return os.path.join(self.absolute, 'deployment.begin')
-
-    @property
-    def deployment_end(self):
-        return os.path.join(self.absolute, 'deployment.end')
-
-    @property
-    def deployment_log(self):
-        return os.path.join(self.absolute, 'deployment.log')
 
     @property
     def yaml(self):
@@ -361,15 +350,59 @@ class BuildPath(YamlPath):
         return os.path.join(self.workspace, '.shipmaster.yaml')
 
     @property
-    def jobs(self):
-        return os.path.join(self.absolute, 'jobs')
+    def deployments(self):
+        return os.path.join(self.absolute, 'deployments')
 
     @property
-    def last_job_number(self):
-        return os.path.join(self.absolute, 'last_job_number')
+    def last_deployment_number(self):
+        return os.path.join(self.absolute, 'last_deployment_number')
+
+    @property
+    def tests(self):
+        return os.path.join(self.absolute, 'tests')
+
+    @property
+    def last_test_number(self):
+        return os.path.join(self.absolute, 'last_test_number')
 
 
 class Build(YamlModel):
+    """
+        Builds in Shipmaster represent a ready to ship docker image. It is
+        intended to be the authoritative immutable binary of a software release.
+
+        A Job is an executing instance of this image usually to do things like deploy the
+        image or run tests.
+
+        For SaaS and generally for "service" based applications this setup makes sense and
+        provides a very natural workflow.
+
+        This is in contrast to most other continuous integration platforms where a "build"
+        is usually just a checkout from version control and then a "job" is the combined building
+        and testing of that checkout. This workflow makes a lot of sense for open source or other
+        projects where the end product is intended to run and often compiled in heterogeneous environments,
+        thus you need a "build matrix" where a job will be created for each element in the matrix
+        building and testing the software under a specific environment.
+
+        The way to reproduce the popular continuous integration workflow in Shipmaster would be to:
+
+          1) Create a "base" image layer with all of the versions of interpreters or compilers and
+             any other libraries needed (to the extent that multiple versions work in a single
+             OS install).
+
+          2) In the Shipmaster "app" image layer don't actually build anything but instead only do
+             general pre-build preparations. Any steps that would be identical in each cell of the
+             test matrix should be done here.
+
+          3) Finally, when running the tests ("job") this is where you can do your building and testing
+             as normally would be done in the standard continuous integration platforms.
+
+        While this setup is a bit more complicated than traditional continuous integration platforms
+        it allows for significant optimizations at various layers. By the time each cell in your test
+        matrix is executed it should only have to do the minimum amount of work to satisfy the matrix
+        constraints.
+
+    """
 
     parent_class = Repository
 
@@ -384,12 +417,16 @@ class Build(YamlModel):
     def create(cls, repo, branch):
         build = cls(repo, repo.increment_build_number(), branch=branch)
         os.mkdir(build.path.absolute)
-        os.mkdir(build.path.jobs)
+        os.mkdir(build.path.tests)
+        os.mkdir(build.path.deployments)
         build.save()
         return build
 
-    def increment_job_number(self):
-        return increment_number_file(self.path.last_job_number)
+    def increment_test_number(self):
+        return increment_number_file(self.path.last_test_number)
+
+    def increment_deployment_number(self):
+        return increment_number_file(self.path.last_deployment_number)
 
     @property
     def branch(self):
@@ -399,29 +436,35 @@ class Build(YamlModel):
     def branch(self, branch):
         self.dict['branch'] = branch
 
-    def get_project(self, log):
+    def get_project(self):
         return Project(
             ProjectConf.from_workspace(self.path.workspace),
             build_num=self.number, ssh_config=self.shipmaster.path.ssh_config,
-            log=log, commit_info=self.commit_info
+            commit_info=self.commit_info
         )
-
-    @property
-    def jobs(self):
-        for job in os.listdir(self.path.jobs):
-            yield Job.load(self, job)
-
-    @property
-    def sorted_jobs(self):
-        return sorted(self.jobs, key=lambda job: int(job.number), reverse=True)
 
     def build(self):
         from .tasks import build_app
         build_app.delay(self.path.absolute)
+        return self
 
-    def deploy(self, service):
-        from .tasks import deploy_app
-        deploy_app.delay(self.path.absolute, service)
+    @property
+    def tests(self):
+        for test in os.listdir(self.path.tests):
+            yield Test.load(self, test)
+
+    @property
+    def sorted_tests(self):
+        return sorted(self.tests, key=lambda item: int(item.number), reverse=True)
+
+    @property
+    def deployments(self):
+        for deployment in os.listdir(self.path.deployments):
+            yield Deployment.load(self, deployment)
+
+    @property
+    def sorted_deployments(self):
+        return sorted(self.deployments, key=lambda item: int(item.number), reverse=True)
 
     # Timers & Progress
 
@@ -466,14 +509,14 @@ class Build(YamlModel):
         return os.path.exists(self.path.build_end)
 
     @property
-    def build_time(self):
+    def elapsed_time(self):
         assert self.has_build_finished
-        return get_time_elapsed(self.path.build_begin, self.path.build_end)
+        return get_elapsed_time(self.path.build_begin, self.path.build_end)
 
     @property
-    def formatted_build_log(self):
+    def log(self):
         assert self.has_build_finished
-        with open(self.path.build_log, 'r') as log_file:
+        with open(self.path.log, 'r') as log_file:
             return log_file.read()
 
     def build_started(self):
@@ -484,37 +527,10 @@ class Build(YamlModel):
         assert not self.has_build_finished
         record_time(self.path.build_end)
 
-    # App Deployment
 
-    @property
-    def has_deployment_started(self):
-        return os.path.exists(self.path.deployment_begin)
+class BaseJobPath(YamlPath):
 
-    @property
-    def has_deployment_finished(self):
-        return os.path.exists(self.path.deployment_end)
-
-    @property
-    def deployment_time(self):
-        assert self.has_deployment_finished
-        return get_time_elapsed(self.path.deployment_begin, self.path.deployment_end)
-
-    @property
-    def formatted_deployment_log(self):
-        assert self.has_deployment_finished
-        with open(self.path.deployment_log, 'r') as log_file:
-            return log_file.read()
-
-    def deployment_started(self):
-        assert not self.has_deployment_started
-        record_time(self.path.deployment_begin)
-
-    def deployment_finished(self):
-        assert not self.has_deployment_finished
-        record_time(self.path.deployment_end)
-
-
-class JobPath(YamlPath):
+    job_type = None
 
     def __init__(self, build, number):
         self.build = build
@@ -522,26 +538,26 @@ class JobPath(YamlPath):
 
     @property
     def absolute(self):
-        return os.path.join(self.build.path.jobs, self.number)
+        raise NotImplemented
 
     @property
     def yaml(self):
-        return os.path.join(self.absolute, 'job.yaml')
+        return os.path.join(self.absolute, self.job_type+'.yaml')
 
     @property
     def log(self):
-        return os.path.join(self.absolute, 'job.log')
+        return os.path.join(self.absolute, self.job_type+'.log')
 
     @property
-    def job_begin(self):
-        return os.path.join(self.absolute, 'job.begin')
+    def begin(self):
+        return os.path.join(self.absolute, self.job_type+'.begin')
 
     @property
-    def job_end(self):
-        return os.path.join(self.absolute, 'job.end')
+    def end(self):
+        return os.path.join(self.absolute, self.job_type+'.end')
 
 
-class Job(YamlModel):
+class BaseJob(YamlModel):
 
     parent_class = Build
 
@@ -551,43 +567,111 @@ class Job(YamlModel):
         self.repo = build.repo  # type: Repository
         self.shipmaster = build.repo.shipmaster  # type: Shipmaster
         self.number = str(number)
-        self.path = JobPath(build, number)
+
+    def get_project(self):
+        return self.build.get_project()
+
+    @property
+    def has_started(self):
+        return os.path.exists(self.path.begin)
+
+    @property
+    def has_finished(self):
+        return os.path.exists(self.path.end)
+
+    def started(self):
+        assert not self.has_started
+        record_time(self.path.begin)
+
+    def finished(self):
+        assert not self.has_finished
+        record_time(self.path.end)
+
+    @property
+    def elapsed_time(self):
+        assert self.has_finished
+        return get_elapsed_time(self.path.begin, self.path.end)
+
+    @property
+    def log(self):
+        assert self.has_finished
+        with open(self.path.log, 'r') as log_file:
+            return log_file.read()
+
+    @property
+    def type_name(self):
+        return self.__class__.__name__.lower()
+
+    @property
+    def is_deployment(self):
+        return self.__class__ == Deployment
+
+    @property
+    def is_test(self):
+        return self.__class__ == Test
+
+
+class DeploymentPath(BaseJobPath):
+    job_type = 'deployment'
+
+    @property
+    def absolute(self):
+        return os.path.join(self.build.path.deployments, self.number)
+
+
+class Deployment(BaseJob):
+
+    def __init__(self, build, number, **kwargs):
+        super().__init__(build, number, **kwargs)
+        self.path = DeploymentPath(build, number)
+
+    @classmethod
+    def create(cls, build, destination):
+        job = cls(build, build.increment_deployment_number())
+        os.mkdir(job.path.absolute)
+        job.destination = destination
+        job.save()
+        return job
+
+    @property
+    def destination(self):
+        return self.dict['destination']
+
+    @destination.setter
+    def destination(self, destination):
+        self.dict['destination'] = destination
+
+    def deploy(self):
+        from .tasks import deploy_app
+        deploy_app.delay(self.path.absolute)
+        return self
+
+
+class TestPath(BaseJobPath):
+    job_type = 'test'
+
+    @property
+    def absolute(self):
+        return os.path.join(self.build.path.tests, self.number)
+
+
+class Test(BaseJob):
+
+    def __init__(self, build, number, **kwargs):
+        super().__init__(build, number, **kwargs)
+        self.path = TestPath(build, number)
 
     @classmethod
     def create(cls, build):
-        job = cls(build, build.increment_job_number())
+        job = cls(build, build.increment_test_number())
         os.mkdir(job.path.absolute)
         job.save()
         return job
 
-    def get_project(self, log):
-        return Project(
-            ProjectConf.from_workspace(self.build.path.workspace),
-            build_num=self.build.number,
-            job_num=self.number,
-            ssh_config=self.shipmaster.path.ssh_config,
-            log=log
-        )
-
     def test(self):
         from .tasks import test_app
         test_app.delay(self.path.absolute)
-
-    @property
-    def has_job_started(self):
-        return os.path.exists(self.path.job_begin)
-
-    @property
-    def has_job_finished(self):
-        return os.path.exists(self.path.job_end)
-
-    def job_started(self):
-        assert not self.has_job_started
-        record_time(self.path.job_begin)
-
-    def job_finished(self):
-        assert not self.has_job_finished
-        record_time(self.path.job_end)
+        return self
 
 
 def record_time(path):
@@ -595,7 +679,7 @@ def record_time(path):
         stamp.write(str(time.time()))
 
 
-def get_time_elapsed(start_path, end_path):
+def get_elapsed_time(start_path, end_path):
     with open(start_path, 'r') as start_file:
         start = float(start_file.read())
     with open(end_path, 'r') as end_file:

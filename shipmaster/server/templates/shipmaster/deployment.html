@@ -1,0 +1,31 @@
+{% extends "shipmaster/base.html" %}
+{% load i18n staticfiles %}
+
+{% block content %}
+
+  <div class="mdl-cell mdl-cell--12-col">
+
+    <div class="mdl-card mdl-shadow--2dp">
+      <div class="mdl-card__supporting-text">
+        <h4>Deployment #{{ current_job.number }} to {{ current_job.destination }}</h4>
+      </div>
+    </div>
+
+    <div class="mdl-card mdl-shadow--2dp" id="log-output"
+         data-path="{{ current_job.path.log }}"
+        {% if current_job.has_finished %}
+         data-finished="{{ current_job.elapsed_time }}"
+        {% endif %}>
+      {% if current_job.has_finished %}
+        {{ current_job.log|linebreaksbr }}
+      {% endif %}
+    </div>
+
+  </div>
+
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static "dart/packages/web_components/webcomponents-lite.min.js" %}"></script>
+  <script type="application/dart" src="{% static "dart/client.dart" %}"></script>
+{% endblock %}

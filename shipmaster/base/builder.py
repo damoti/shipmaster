@@ -1,19 +1,21 @@
 import os
+import time
+import struct
+import logging
 from docker import Client
+from docker import constants as docker_constants
 from compose.service import Service
 from compose.service import Container
 from compose.project import Project as ComposeProject
-from requests.exceptions import ReadTimeout
+from requests.packages.urllib3.exceptions import ReadTimeoutError
 from .config import ProjectConf, LayerConf
-from .script import Archive, Script, SCRIPT_PATH
-from .utils import UnbufferedLineIO
+from .script import Archive, Script, SCRIPT_PATH, APP_PATH
 
 
 class Project:
 
-    def __init__(self, conf: ProjectConf, log, build_num='0', job_num='0', commit_info=None, ssh_config=None, verbose=False, debug_ssh=False):
+    def __init__(self, conf: ProjectConf, build_num='0', job_num='0', commit_info=None, ssh_config=None, verbose=False, debug_ssh=False, editable=False):
         self.conf = conf
-        self.log = UnbufferedLineIO(log) if not isinstance(log, UnbufferedLineIO) else log
         self.build_num = build_num
         self.commit_info = commit_info
         self.job_num = job_num
@@ -57,31 +59,32 @@ class Project:
             ]
 
         self.base = BaseLayer(self, self.conf.base)
-        self.app = AppLayer(self, self.conf.app)
+        self.app = AppLayer(self, self.conf.app, editable)
         self.test = TestLayer(self, self.conf.test)
 
 
 class LayerBase:
 
     def __init__(self, project: Project, layer: LayerConf):
+        self.log = logging.getLogger('builder')
+        self.log.setLevel(logging.INFO)
         self.project = project
         self.layer = layer
-        self.log = project.log
-        self.archive = Archive(project.conf.workspace, project.log)
+        self.archive = Archive(project.conf.workspace)
         self.environment = {**project.environment, **layer.environment}
         self.volumes = project.volumes.copy()
 
     def start_and_commit(self, container, cmd):
         client = self.project.client
-        self.log.write('Uploading...')
+        self.log.info('Uploading...')
         client.put_archive(container, '/', self.archive.getfile())
-        self.log.write('Starting...')
+        self.log.info('Starting...')
         client.start(container)
         for line in client.logs(container, stream=True):
-            self.log.write(line.decode(), newline=False)
+            self.log.info(line.decode().rstrip())
         client.stop(container)
         repository, tag = self.image_name.split(':')
-        conf = client.create_container_config(self.image_name, cmd, working_dir="/app")
+        conf = client.create_container_config(self.image_name, cmd, working_dir=APP_PATH)
         client.commit(container, repository=repository, tag=tag, conf=conf)
         client.remove_container(container)
 
@@ -97,6 +100,9 @@ class LayerBase:
 
     def exists(self):
         return bool(self.image_info)
+
+    def remove(self):
+        self.project.client.remove_image(self.image_name)
 
     @property
     def from_image(self):
@@ -133,7 +139,7 @@ class BaseLayer(LayerBase):
         return script
 
     def build(self):
-        self.log.write('Building: {} FROM {}'.format(self.image_name, self.from_image))
+        self.log.info('Building: {} FROM {}'.format(self.image_name, self.from_image))
 
         script = self.get_script()
         self.archive.add_script(script)
@@ -146,6 +152,14 @@ class BaseLayer(LayerBase):
 
 class AppLayer(LayerBase):
 
+    def __init__(self, project: Project, layer: LayerConf, editable=False):
+        super().__init__(project, layer)
+        self.editable = editable
+        if self.editable:
+            self.volumes.append(
+                "{}:{}".format(os.getcwd(), APP_PATH)
+            )
+
     @property
     def image_name(self):
         return "{}:b{}".format(self.layer.repository, self.project.build_num)
@@ -156,25 +170,30 @@ class AppLayer(LayerBase):
 
     def get_script(self):
         script = Script('build_app.sh')
+        if self.project.debug_ssh:
+            script.write_debug_ssh(
+                self.project.conf.name,
+                self.project.conf.ssh.known_hosts
+            )
         script.write_apt_get(self.layer.apt_get)
         script.write_build(self.layer.build)
         return script
 
     def build(self):
 
-        if not self.project.base.exists():
-            self.project.base.build()
-
-        self.log.write('Building: {} FROM {}'.format(self.image_name, self.from_image))
+        self.log.info('Building: {} FROM {}'.format(self.image_name, self.from_image))
 
         script = self.get_script()
         self.archive.add_script(script)
 
-        for file in self.layer.context:
-            self.archive.add_project_file(file)
+        if not self.editable:
+            for file in self.layer.context:
+                self.archive.add_project_file(file)
 
         labels = {'git-'+k: v for k, v in self.project.commit_info.items()}
         labels['shipmaster-build'] = self.project.build_num
+        if self.editable:
+            labels['editable'] = 'yes'
 
         start_command = self.layer.start
         if self.layer.wait_for:
@@ -187,7 +206,6 @@ class AppLayer(LayerBase):
         self.start_and_commit(self.create(script, labels), cmd=['/bin/sh', '-c', start_command])
 
     def deploy(self, compose: ComposeProject, service_name):
-        log = self.log
 
         # Make sure the custom network is up
         compose.initialize()
@@ -196,24 +214,24 @@ class AppLayer(LayerBase):
 
         # 1. Tag the new image with what docker-compose is expecting.
         image_name, tag = service.image_name.split(':')
-        log.write("Tagging: {} -> {}:{}".format(self.image_name, image_name, tag))
+        self.log.info("Tagging: {} -> {}:{}".format(self.image_name, image_name, tag))
         service.client.tag(self.image_name, image_name, tag)
 
         # 2. Stop and remove the existing container(s).
         for c in service.containers():  # type: Container
-            log.write("Stopping: {}".format(c.name))
+            self.log.info("Stopping: {}".format(c.name))
             c.stop(timeout=30)
             c.remove()
 
         if self.layer.prepare:
 
             # 3. Run upgrade/migration scripts to prepare environment for this deployment.
-            log.write("Running Preparation Script / Migrations")
+            self.log.info("Running Migrations...")
 
             labels = service.client.images(self.image_name)[0].get('Labels', {})
 
             #   a. Create upgrade script.
-            archive = Archive(self.project.conf.workspace, log)
+            archive = Archive(self.project.conf.workspace)
             script = Script('pre_deploy_script.sh')
             script.write("cd /app")
             for command in self.layer.prepare:
@@ -226,10 +244,13 @@ class AppLayer(LayerBase):
 
             #   c. Run upgrade script.
             service.start_container(container)
-            log.write("Waiting.")
-            service.client.wait(container.id, 60*15)  # Timeout if not finished after 15 minutes
-            log.write(container.logs().decode(), newline=False)
+            for line in container.logs(stream=True):
+                self.log.info(line.decode().rstrip())
+            result = service.client.wait(container.id)
             container.remove()
+            if result != 0:
+                self.log.error("Migration failed.")
+                return result
 
         # 4. Deploy
 
@@ -238,17 +259,40 @@ class AppLayer(LayerBase):
         # command line `docker-compose` it should work identical
         # to when shipmaster starts the container
         container = service.create_container()
-        log.write("Starting: {}".format(container.id))
+        self.log.info("Starting: {}".format(container.id))
         service.start_container(container)
-        try:
-            service.client.wait(container.id, 10)
-        except ReadTimeout:
-            # timeout exception expected since the process is not
-            # supposed to finish under normal conditions
-            # we wait 10 secs for the purpose of collecting some log output
-            pass
-        finally:
-            log.write(container.logs().decode(), newline=False)
+        stream_log_for_seconds(container, self.log, 10)
+        self.log.info("Finished streaming.")
+
+
+def stream_log_for_seconds(container, outlog, secs):
+
+    client = container.client
+
+    url = client._url("/containers/{0}/logs", container.id)
+    params = {'stderr': True, 'stdout': True, 'timestamps': False, 'follow': True, 'tail': 'all'}
+    response = client._get(url, params=params, stream=True)
+
+    socket = client._get_raw_response_socket(response)
+    socket._sock.settimeout(secs)
+
+    try:
+        start = time.time()
+        while True:
+            header = response.raw.read(docker_constants.STREAM_HEADER_SIZE_BYTES)
+            if not header:
+                break
+            _, length = struct.unpack('>BxxxL', header)
+            if not length:
+                continue
+            data = response.raw.read(length)
+            if not data:
+                break
+            outlog.info(data.decode().rstrip())
+            if (time.time() - start) >= secs:
+                break
+    except ReadTimeoutError:
+        pass
 
 
 class TestLayer(LayerBase):
@@ -261,6 +305,17 @@ class TestLayer(LayerBase):
     def from_image(self):
         return self.project.app.image_name
 
+    @property
+    def app_image_info(self):
+        images = self.project.client.images(self.from_image)
+        if images:
+            return images[0]
+
+    @property
+    def is_editable(self):
+        app_info = self.app_image_info or {}
+        return 'editable' in app_info.get('Labels', [])
+
     def get_script(self):
         script = Script('test_app.sh')
         script.write_apt_get(self.layer.apt_get)
@@ -269,15 +324,40 @@ class TestLayer(LayerBase):
 
     def build(self):
 
-        if not self.project.app.exists():
-            self.project.app.build()
-
-        self.log.write('Building: {} FROM {}'.format(self.image_name, self.from_image))
+        self.log.info('Building: {} FROM {}'.format(self.image_name, self.from_image))
 
         script = self.get_script()
         self.archive.add_script(script)
 
-        for file in self.layer.context:
-            self.archive.add_project_file(file)
+        if self.is_editable:
+            self.volumes.append(
+                "{}:{}".format(os.getcwd(), APP_PATH)
+            )
+        else:
+            for file in self.layer.context:
+                self.archive.add_project_file(file)
 
         self.start_and_commit(self.create(script), cmd=self.layer.start)
+
+    def run(self):
+        self.log.info('Running tests in {}...'.format(self.image_name))
+        if self.is_editable:
+            self.volumes.append(
+                "{}:{}".format(os.getcwd(), APP_PATH)
+            )
+        client = self.project.client
+        result = client.create_container(
+            self.image_name, command=['/bin/sh', '-c', self.layer.start],
+            volumes=[v.split(':')[1] for v in self.volumes],
+            environment=self.environment,
+            host_config=self.project.client.create_host_config(
+                binds=self.volumes,
+                network_mode='testing'
+            ),
+        )
+        container = result.get('Id')
+        client.start(container)
+        for line in client.logs(container, stream=True):
+            self.log.info(line.decode().rstrip())
+        client.stop(container)
+        #client.remove_container(container)

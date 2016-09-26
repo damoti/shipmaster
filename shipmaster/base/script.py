@@ -1,5 +1,6 @@
 import os
 import io
+import logging
 from fnmatch import fnmatch
 from tarfile import TarFile, TarInfo
 from tempfile import NamedTemporaryFile
@@ -71,12 +72,14 @@ class Script:
             self.write('ssh-keyscan {} >> /root/.ssh/known_hosts {}'.format(host, hide_error))
             self.write('echo "Host *{0}\n HostName {0}" >> /root/.ssh/config'.format(host))
 
-        if debug_ssh_agent:
-            self.write('ssh-add -L')
+        debug_ssh_agent and self.write_debug_ssh(project_name, known_hosts)
 
-        if debug_ssh_agent:
-            for host in known_hosts:
-                self.write('ssh -T git@{}.{}'.format(project_name, host))
+    def write_debug_ssh(self, project_name, known_hosts):
+        self.write('cat /root/.ssh/config')
+        self.write('cat /root/.ssh/known_hosts')
+        self.write('ssh-add -L')
+        for host in known_hosts:
+            self.write('ssh -T git@{}.{}'.format(project_name, host))
 
     def write_apt_get(self, apt_get):
         self.write('# Packages')
@@ -95,9 +98,9 @@ class Script:
 
 class Archive:
 
-    def __init__(self, workspace, log):
+    def __init__(self, workspace):
         self.workspace = workspace
-        self.log = log
+        self.log = logging.getLogger('archive')
         self.base = os.path.abspath(os.path.dirname(__file__))
         self.archive_file = NamedTemporaryFile('wb+')
         self.archive = TarFile.open(mode='w', fileobj=self.archive_file)
@@ -126,7 +129,7 @@ class Archive:
         relative = os.path.relpath(abspath, APP_PATH)
         for pattern in self.exclude:
             if fnmatch(relative, pattern):
-                self.log.write('excluding '+relative)
+                self.log.debug('excluding '+relative)
                 return None
         return info
 
@@ -142,7 +145,7 @@ class Archive:
         self.archive_file.seek(0)
         self._closed = True
         size = os.path.getsize(self.archive_file.name)
-        self.log.write('Archive: {}'.format(format_size(size)))
+        self.log.info('Archive: {}'.format(format_size(size)))
 
     def getfile(self):
         if not self._closed:
