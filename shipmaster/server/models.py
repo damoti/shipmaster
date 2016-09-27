@@ -7,8 +7,7 @@ import subprocess
 from collections import OrderedDict
 from ruamel import yaml
 
-from compose.cli.command import get_project
-from compose.config import config as compose_config
+from compose.cli.command import get_project as get_compose
 
 from shipmaster.base.builder import Project
 from shipmaster.base.config import ProjectConf
@@ -249,7 +248,7 @@ class Infrastructure(Repository):
         self.path = InfrastructurePath(shipmaster, self.name)
         self.compose = None
         if os.path.exists(self.path.src):
-            self.compose = get_project(self.path.src, host='unix://var/run/docker.sock')
+            self.compose = get_compose(self.path.src, host='unix://var/run/docker.sock')
 
     @classmethod
     def load(cls, parent, name=None):
@@ -350,6 +349,10 @@ class BuildPath(YamlPath):
         return os.path.join(self.workspace, '.shipmaster.yaml')
 
     @property
+    def docker_compose(self):
+        return os.path.join(self.workspace, 'docker-compose.yaml')
+
+    @property
     def deployments(self):
         return os.path.join(self.absolute, 'deployments')
 
@@ -429,6 +432,18 @@ class Build(YamlModel):
         return increment_number_file(self.path.last_deployment_number)
 
     @property
+    def result_display(self):
+        return self.result.capitalize()
+
+    @property
+    def result(self):
+        return self.dict.get('result', '')
+
+    @result.setter
+    def result(self, result):
+        self.dict['result'] = result
+
+    @property
     def branch(self):
         return self.dict['branch']
 
@@ -467,6 +482,14 @@ class Build(YamlModel):
         return sorted(self.deployments, key=lambda item: int(item.number), reverse=True)
 
     # Timers & Progress
+
+    def failed(self):
+        self.result = 'failed'
+        self.save()
+
+    def succeeded(self):
+        self.result = 'succeeded'
+        self.save()
 
     @property
     def commit_info(self):
@@ -572,6 +595,26 @@ class BaseJob(YamlModel):
         return self.build.get_project()
 
     @property
+    def result_display(self):
+        return self.result.capitalize()
+
+    @property
+    def result(self):
+        return self.dict.get('result', '')
+
+    @result.setter
+    def result(self, result):
+        self.dict['result'] = result
+
+    def failed(self):
+        self.result = 'failed'
+        self.save()
+
+    def succeeded(self):
+        self.result = 'succeeded'
+        self.save()
+
+    @property
     def has_started(self):
         return os.path.exists(self.path.begin)
 
@@ -660,6 +703,13 @@ class Test(BaseJob):
     def __init__(self, build, number, **kwargs):
         super().__init__(build, number, **kwargs)
         self.path = TestPath(build, number)
+
+    @property
+    def get_compose(self):
+        return get_compose(
+            self.build.path.workspace,
+            host='unix://var/run/docker.sock'
+        )
 
     @classmethod
     def create(cls, build):

@@ -1,6 +1,6 @@
 from channels import route_class
-from .consumers import LogsServer
+from .logserver import LogSubscriptionConsumer
 
 channel_routing = [
-    route_class(LogsServer, path=r"^/log/(?P<path>.+)"),
+    route_class(LogSubscriptionConsumer, path=r"^/log/(?P<path>.+)"),
 ]

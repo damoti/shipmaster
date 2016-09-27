@@ -19,7 +19,7 @@
       <ul>
         {% for job in current_build.sorted_tests %}
           <li>
-            <a href="{% url "test" current_repo.name current_build.number job.number %}">{{ job.number }}</a>
+            <a href="{% url "test" current_repo.name current_build.number job.number %}">Test Run # {{ job.number }} {{ job.result_display }}</a>
           </li>
         {% endfor %}
       </ul>
@@ -36,7 +36,7 @@
       <ul>
         {% for deployment in current_build.sorted_deployments %}
           <li>
-            <a href="{% url "deployment" current_repo.name current_build.number deployment.number %}">Deployment #{{ deployment.number }} to {{ deployment.destination }}</a>
+            <a href="{% url "deployment" current_repo.name current_build.number deployment.number %}">Deployment #{{ deployment.number }} to {{ deployment.destination }} {{ deployment.result }}</a>
           </li>
         {% endfor %}
       </ul>

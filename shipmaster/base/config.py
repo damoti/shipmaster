@@ -1,6 +1,5 @@
 import os
 from ruamel import yaml
-from compose.config import config as compose_config
 
 
 class ProjectConf:

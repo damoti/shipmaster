@@ -6,6 +6,8 @@ from ..base.builder import Project
 from ..base.config import ProjectConf
 
 
+logger = logging.getLogger('shipmaster')
+
 LAYERS = ['base', 'app', 'test']
 
 
@@ -36,8 +38,6 @@ def parse_arguments():
 
 def build_command(args, project):
 
-    log = logging.getLogger('build')
-
     if args.script:
         layer = getattr(project, args.layer)
         print(layer.get_script().source)
@@ -48,7 +48,7 @@ def build_command(args, project):
 
         layer = getattr(project, layer_name)
 
-        log.info("Checking for existing {} container.".format(layer_name))
+        logger.info("Checking for existing {} image.".format(layer_name))
 
         if layer_name == args.layer:
 
@@ -56,17 +56,17 @@ def build_command(args, project):
                 if args.rebuild or args.rebuild_all:
                     layer.remove()
                 else:
-                    log.info("{} container already exists, run with '--rebuild' to rebuild.".format(layer_name.capitalize()))
+                    logger.info("{} image already exists, run with '--rebuild' to rebuild.".format(layer_name.capitalize()))
                     sys.exit(1)
             layer.build()
-            log.info("Done.")
+            logger.info("Done.")
             break
 
         else:
 
             if not layer.exists():
                 if not args.build_all:
-                    log.info("Parent container {} doesn't exist, run with '--build-all' to build it.".format(layer_name.capitalize()))
+                    logger.info("Parent image {} doesn't exist, run with '--build-all' to build it.".format(layer_name.capitalize()))
                     sys.exit(1)
                 layer.build()
             elif args.rebuild_all:
@@ -75,7 +75,14 @@ def build_command(args, project):
 
 
 def test_command(args, project):
-    project.test.run()
+    from compose.cli.command import get_project as get_compose
+    project.test.run(
+        get_compose(
+            os.getcwd(),
+            project_name=project.test_name,
+            host='unix://var/run/docker.sock'
+        )
+    )
 
 
 def main():
@@ -87,13 +94,12 @@ def main():
             - build and run a test image
             - deploy app image locally (local docker-compose.yml)
     """
-    logging.basicConfig(level=logging.INFO)
     args = parse_arguments()
+    logging.basicConfig(level=logging.INFO)  # TODO: set from args
     project = Project(
         ProjectConf.from_workspace(os.getcwd()),
         commit_info={},
         debug_ssh=getattr(args, 'debug_ssh_agent', False),
-        verbose=True,
         editable=getattr(args, 'editable', False)
     )
     if hasattr(args, 'command'):

@@ -6,6 +6,7 @@ from tarfile import TarFile, TarInfo
 from tempfile import NamedTemporaryFile
 from humanfriendly import format_size
 
+logger = logging.getLogger('shipmaster')
 SCRIPT_PATH = '/shipmaster/scripts/'
 APP_PATH = '/app'
 
@@ -100,7 +101,6 @@ class Archive:
 
     def __init__(self, workspace):
         self.workspace = workspace
-        self.log = logging.getLogger('archive')
         self.base = os.path.abspath(os.path.dirname(__file__))
         self.archive_file = NamedTemporaryFile('wb+')
         self.archive = TarFile.open(mode='w', fileobj=self.archive_file)
@@ -129,7 +129,7 @@ class Archive:
         relative = os.path.relpath(abspath, APP_PATH)
         for pattern in self.exclude:
             if fnmatch(relative, pattern):
-                self.log.debug('excluding '+relative)
+                logger.debug('excluding '+relative)
                 return None
         return info
 
@@ -145,7 +145,7 @@ class Archive:
         self.archive_file.seek(0)
         self._closed = True
         size = os.path.getsize(self.archive_file.name)
-        self.log.info('Archive: {}'.format(format_size(size)))
+        logger.info('Archive: {}'.format(format_size(size)))
 
     def getfile(self):
         if not self._closed:

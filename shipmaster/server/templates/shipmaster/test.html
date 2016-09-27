@@ -3,18 +3,24 @@
 
 {% block content %}
 
-  <div class="mdl-cell mdl-cell--6-col">
+  <div class="mdl-cell mdl-cell--12-col">
 
     <div class="mdl-card mdl-shadow--2dp">
       <div class="mdl-card__supporting-text">
-        <h4>Test Job</h4>
+        <h4>Test #{{ current_job.number }}</h4>
       </div>
     </div>
 
-  </div>
+    <div class="mdl-card mdl-shadow--2dp" id="log-output"
+         data-path="{{ current_job.path.log }}"
+        {% if current_job.has_finished %}
+         data-finished="{{ current_job.elapsed_time }}"
+        {% endif %}>
+      {% if current_job.has_finished %}
+        {{ current_job.log|linebreaksbr }}
+      {% endif %}
+    </div>
 
-  <div class="mdl-cell mdl-cell--6-col mdl-shadow--2dp mdl-color--white">
-    <div id="job-log" data-path="{{ current_job.path.log }}"></div>
   </div>
 
 {% endblock %}

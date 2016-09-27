@@ -4,22 +4,23 @@ import struct
 import logging
 from docker import Client
 from docker import constants as docker_constants
-from compose.service import Service
+from compose.service import Service, VolumeSpec
 from compose.service import Container
 from compose.project import Project as ComposeProject
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 from .config import ProjectConf, LayerConf
 from .script import Archive, Script, SCRIPT_PATH, APP_PATH
 
+logger = logging.getLogger('shipmaster')
+
 
 class Project:
 
-    def __init__(self, conf: ProjectConf, build_num='0', job_num='0', commit_info=None, ssh_config=None, verbose=False, debug_ssh=False, editable=False):
+    def __init__(self, conf: ProjectConf, build_num='0', job_num='0', commit_info=None, ssh_config=None, debug_ssh=False, editable=False):
         self.conf = conf
         self.build_num = build_num
         self.commit_info = commit_info
         self.job_num = job_num
-        self.verbose = verbose
         self.client = Client('unix://var/run/docker.sock')
 
         self.debug_ssh = debug_ssh
@@ -62,12 +63,18 @@ class Project:
         self.app = AppLayer(self, self.conf.app, editable)
         self.test = TestLayer(self, self.conf.test)
 
+    @property
+    def test_tag(self):
+        return "{}b{}t".format(self.build_num, self.job_num)
+
+    @property
+    def test_name(self):
+        return "{}{}".format(self.conf.name, self.test_tag)
+
 
 class LayerBase:
 
     def __init__(self, project: Project, layer: LayerConf):
-        self.log = logging.getLogger('builder')
-        self.log.setLevel(logging.INFO)
         self.project = project
         self.layer = layer
         self.archive = Archive(project.conf.workspace)
@@ -76,17 +83,22 @@ class LayerBase:
 
     def start_and_commit(self, container, cmd):
         client = self.project.client
-        self.log.info('Uploading...')
+        logger.info('Uploading...')
         client.put_archive(container, '/', self.archive.getfile())
-        self.log.info('Starting...')
+        logger.info('Starting...')
         client.start(container)
         for line in client.logs(container, stream=True):
-            self.log.info(line.decode().rstrip())
-        client.stop(container)
-        repository, tag = self.image_name.split(':')
-        conf = client.create_container_config(self.image_name, cmd, working_dir=APP_PATH)
-        client.commit(container, repository=repository, tag=tag, conf=conf)
+            logger.info(line.decode().rstrip())
+        result = client.wait(container)
+        if result == 0:
+            # Only tag image if container was built successfully.
+            repository, tag = self.image_name, None
+            if ':' in repository:
+                repository, tag = tag.split(':')
+            conf = client.create_container_config(self.image_name, cmd, working_dir=APP_PATH)
+            client.commit(container, repository=repository, tag=tag, conf=conf)
         client.remove_container(container)
+        return result
 
     def create(self, script, labels=None):
         result = self.project.client.create_container(
@@ -139,7 +151,7 @@ class BaseLayer(LayerBase):
         return script
 
     def build(self):
-        self.log.info('Building: {} FROM {}'.format(self.image_name, self.from_image))
+        logger.info('Building: {} FROM {}'.format(self.image_name, self.from_image))
 
         script = self.get_script()
         self.archive.add_script(script)
@@ -147,7 +159,7 @@ class BaseLayer(LayerBase):
         for file in self.layer.context:
             self.archive.add_project_file(file)
 
-        self.start_and_commit(self.create(script), cmd="echo 'Base image does not do anything.'")
+        return self.start_and_commit(self.create(script), cmd="echo 'Base image does not do anything.'")
 
 
 class AppLayer(LayerBase):
@@ -181,7 +193,7 @@ class AppLayer(LayerBase):
 
     def build(self):
 
-        self.log.info('Building: {} FROM {}'.format(self.image_name, self.from_image))
+        logger.info('Building: {} FROM {}'.format(self.image_name, self.from_image))
 
         script = self.get_script()
         self.archive.add_script(script)
@@ -203,7 +215,7 @@ class AppLayer(LayerBase):
                 start_command
             )
 
-        self.start_and_commit(self.create(script, labels), cmd=['/bin/sh', '-c', start_command])
+        return self.start_and_commit(self.create(script, labels), cmd=['/bin/sh', '-c', start_command])
 
     def deploy(self, compose: ComposeProject, service_name):
 
@@ -214,19 +226,19 @@ class AppLayer(LayerBase):
 
         # 1. Tag the new image with what docker-compose is expecting.
         image_name, tag = service.image_name.split(':')
-        self.log.info("Tagging: {} -> {}:{}".format(self.image_name, image_name, tag))
+        logger.info("Tagging: {} -> {}:{}".format(self.image_name, image_name, tag))
         service.client.tag(self.image_name, image_name, tag)
 
         # 2. Stop and remove the existing container(s).
         for c in service.containers():  # type: Container
-            self.log.info("Stopping: {}".format(c.name))
+            logger.info("Stopping: {}".format(c.name))
             c.stop(timeout=30)
             c.remove()
 
         if self.layer.prepare:
 
             # 3. Run upgrade/migration scripts to prepare environment for this deployment.
-            self.log.info("Running Migrations...")
+            logger.info("Running Migrations...")
 
             labels = service.client.images(self.image_name)[0].get('Labels', {})
 
@@ -245,11 +257,11 @@ class AppLayer(LayerBase):
             #   c. Run upgrade script.
             service.start_container(container)
             for line in container.logs(stream=True):
-                self.log.info(line.decode().rstrip())
+                logger.info(line.decode().rstrip())
             result = service.client.wait(container.id)
             container.remove()
             if result != 0:
-                self.log.error("Migration failed.")
+                logger.error("Migration failed.")
                 return result
 
         # 4. Deploy
@@ -259,13 +271,12 @@ class AppLayer(LayerBase):
         # command line `docker-compose` it should work identical
         # to when shipmaster starts the container
         container = service.create_container()
-        self.log.info("Starting: {}".format(container.id))
+        logger.info("Starting: {}".format(container.id))
         service.start_container(container)
-        stream_log_for_seconds(container, self.log, 10)
-        self.log.info("Finished streaming.")
+        return read_container_log_for_seconds(container, 10)
 
 
-def stream_log_for_seconds(container, outlog, secs):
+def read_container_log_for_seconds(container, secs):
 
     client = container.client
 
@@ -288,18 +299,25 @@ def stream_log_for_seconds(container, outlog, secs):
             data = response.raw.read(length)
             if not data:
                 break
-            outlog.info(data.decode().rstrip())
+            logger.info(data.decode().rstrip())
             if (time.time() - start) >= secs:
                 break
     except ReadTimeoutError:
         pass
+
+    if container.is_running:
+        return 0  # if it's running then all is good, that's all we can know
+    else:
+        # logically a deployed container shouldn't exit but
+        # we'll let it speak for itself about what happened
+        return container.exit_code
 
 
 class TestLayer(LayerBase):
 
     @property
     def image_name(self):
-        return "{}:j{}".format(self.layer.repository, self.project.job_num)
+        return "{}_test".format(self.project.test_name)
 
     @property
     def from_image(self):
@@ -324,7 +342,7 @@ class TestLayer(LayerBase):
 
     def build(self):
 
-        self.log.info('Building: {} FROM {}'.format(self.image_name, self.from_image))
+        logger.info('Building: {} FROM {}'.format(self.image_name, self.from_image))
 
         script = self.get_script()
         self.archive.add_script(script)
@@ -337,27 +355,40 @@ class TestLayer(LayerBase):
             for file in self.layer.context:
                 self.archive.add_project_file(file)
 
-        self.start_and_commit(self.create(script), cmd=self.layer.start)
+        return self.start_and_commit(self.create(script), cmd=self.layer.start)
 
-    def run(self):
-        self.log.info('Running tests in {}...'.format(self.image_name))
+    def run(self, compose: ComposeProject):
+
+        logger.info('Running tests in {}...'.format(self.image_name))
+
+        # Make sure the custom network is up
+        compose.initialize()
+
+        service = compose.get_service('test')  # type: Service
+
         if self.is_editable:
             self.volumes.append(
                 "{}:{}".format(os.getcwd(), APP_PATH)
             )
-        client = self.project.client
-        result = client.create_container(
-            self.image_name, command=['/bin/sh', '-c', self.layer.start],
-            volumes=[v.split(':')[1] for v in self.volumes],
+
+        container = service.create_container(
+            one_off=True,
+            command=['/bin/sh', '-c', self.layer.start],
+            volumes=map(VolumeSpec.parse, self.volumes),
             environment=self.environment,
-            host_config=self.project.client.create_host_config(
-                binds=self.volumes,
-                network_mode='testing'
-            ),
         )
-        container = result.get('Id')
-        client.start(container)
-        for line in client.logs(container, stream=True):
-            self.log.info(line.decode().rstrip())
-        client.stop(container)
-        #client.remove_container(container)
+
+        compose.up(service.get_dependency_names())
+
+        # TODO: Need a more intelligent way to wait for dependencies to come up.
+        time.sleep(10)
+
+        service.start_container(container)
+        for line in container.logs(stream=True):
+            logger.info(line.decode().rstrip())
+
+        result = service.client.wait(container.id)
+        container.remove()
+        if result != 0:
+            logger.error("Test run failed.")
+        return result
