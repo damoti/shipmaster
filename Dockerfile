@@ -17,6 +17,7 @@ RUN pub build
 
 WORKDIR /usr/lib/shipmaster
 RUN pip3 install -r requirements.pip
+RUN python3 manage.py migrate
 
 EXPOSE 8080
 CMD ["/usr/bin/supervisord"]

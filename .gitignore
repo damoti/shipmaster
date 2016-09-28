@@ -3,6 +3,7 @@ build/
 dist/
 __pycache__
 shipmaster.egg-info
+shipmaster/db.sqlite3
 shipmaster/dart/.pub/
 shipmaster/dart/.packages
 shipmaster/dart/packages/
