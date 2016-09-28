@@ -94,7 +94,7 @@ class LayerBase:
             # Only tag image if container was built successfully.
             repository, tag = self.image_name, None
             if ':' in repository:
-                repository, tag = tag.split(':')
+                repository, tag = repository.split(':')
             conf = client.create_container_config(self.image_name, cmd, working_dir=APP_PATH)
             client.commit(container, repository=repository, tag=tag, conf=conf)
         client.remove_container(container)
