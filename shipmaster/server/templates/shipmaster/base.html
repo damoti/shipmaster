@@ -1,4 +1,4 @@
-{% load i18n staticfiles %}
+{% load i18n static dartium %}
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
 <head>
@@ -97,7 +97,8 @@
     </div>
 
     <script src="{% static "material.js" %}"></script>
-    {% block extra_js %}
+    {% webcomponents 'lite' %}
+    {% block script %}
     {% endblock %}
 
 </body>

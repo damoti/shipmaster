@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_dartium',
     'bootstrapform',
     'channels',
     'shipmaster.server'
@@ -55,6 +56,7 @@ MIDDLEWARE_CLASSES = [
     'shipmaster.server.middleware.AccessTokenUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_dartium.middleware.DartiumDetectionMiddleware',
     'shipmaster.server.middleware.ShipmasterMiddleware'
 ]
 
@@ -137,6 +139,6 @@ STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
     ('', 'shipmaster/server/static'),
-    #('dart', 'shipmaster/dart/build/web')
-    ('dart', 'shipmaster/dart/web')
+    ('dart/build', 'shipmaster/dart/build/web'),
+    ('dart/src', 'shipmaster/dart/web'),
 ]
