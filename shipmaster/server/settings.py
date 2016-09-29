@@ -62,10 +62,9 @@ MIDDLEWARE_CLASSES = [
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
-if 'migrate' not in sys.argv:
-    GITHUB_ORG = os.environ['GITHUB_ORG']
-    OAUTH_KEY = os.environ['OAUTH_KEY']  # Client ID
-    OAUTH_SECRET = os.environ['OAUTH_SECRET']  # Client Secret
+GITHUB_ORG = os.environ.get('GITHUB_ORG')
+OAUTH_KEY = os.environ.get('OAUTH_KEY')  # Client ID
+OAUTH_SECRET = os.environ.get('OAUTH_SECRET')  # Client Secret
 
 ROOT_URLCONF = 'shipmaster.server.urls'
 
