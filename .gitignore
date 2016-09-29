@@ -1,8 +1,10 @@
 .idea/
 build/
+static/
 dist/
 __pycache__
 docker-compose.override.yml
+supervisord.log
 shipmaster.egg-info
 shipmaster/db.sqlite3
 shipmaster/dart/.pub/

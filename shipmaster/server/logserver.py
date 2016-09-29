@@ -5,7 +5,7 @@ from channels.generic.websockets import JsonWebsocketConsumer
 from twisted.internet.epollreactor import EPollReactor
 from twisted.internet import reactor as _reactor; reactor = _reactor  # type: EPollReactor
 
-logger = logging.getLogger('logservice')
+logger = logging.getLogger(__name__)
 
 
 class LogFileState:
@@ -107,3 +107,19 @@ class LogSubscriptionConsumer(JsonWebsocketConsumer):
 
 def setup(channels):
     reactor.callLater(3, LogStreamingService(channels).start)
+
+
+def run():
+    import os
+    from shipmaster.server.asgi import channel_layer
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)-15s %(levelname)-8s %(message)s",
+    )
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "shipmaster.server.settings")
+    LogStreamingService(channel_layer).start()
+    reactor.run()
+
+
+if __name__ == "__main__":
+    run()

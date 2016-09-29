@@ -41,10 +41,13 @@ class GitHubAuthorized(GitHub):
 
         data = github.get('https://api.github.com/user').json()
 
+        if not data['login']:
+            raise AttributeError('Username not provided by GitHub during authorization.')
+
         user, created = User.objects.get_or_create(username=data['login'])
-        user.name = data['name']
-        user.email = data['email']
-        user.avatar = data['avatar_url']
+        user.name = data.get('name') or ''
+        user.email = data.get('email') or ''
+        user.avatar = data.get('avatar_url') or ''
         user.json = data
         user.save()
 

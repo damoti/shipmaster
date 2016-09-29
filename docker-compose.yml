@@ -8,11 +8,7 @@ services:
       OAUTH_KEY: ''
       OAUTH_SECRET: ''
     ports:
-      - "8080:8000"
+      - "8000:8000"
     volumes:
       - /var/lib/shipmaster:/var/lib/shipmaster
       - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      - rabbitmq
-  rabbitmq:
-    image: rabbitmq
