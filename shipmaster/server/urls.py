@@ -1,19 +1,27 @@
-from django.conf.urls import url
+from django.conf.urls import url, include
 from django.views.decorators.csrf import csrf_exempt
-from . import views
+from django.contrib.auth.decorators import login_required
+from . import views, github
 
 urlpatterns = [
 
-    url(r"^$", views.Dashboard.as_view(), name="dashboard"),
-    url(r"^settings$", views.SettingsView.as_view(), name="settings"),
+    # GitHub
+    url(r"^login$", github.GitHubLogin.as_view(), name='login'),
+    url(r"^authorized$", github.GitHubAuthorized.as_view()),
+    url(r"^event$", csrf_exempt(github.GitHubEvent.as_view())),
 
-    url(r"^create-repository$", views.CreateRepository.as_view(), name="repository.create"),
-    url(r"^repository/(?P<repo>[\w\.\-]+)/$", views.RepositoryView.as_view(), name="repository"),
-    url(r"^repository/(?P<repo>[\w\.\-]+)/pull$", csrf_exempt(views.StartBuild.as_view()), name="build.start"),
-    url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/$", views.BuildView.as_view(), name="build"),
-    url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/start-test$", views.StartTest.as_view(), name="test.start"),
-    url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/test/(?P<test>\d+)/$", views.TestView.as_view(), name="test"),
-    url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/start-deployment/(?P<destination>[\w\.\-]+)$", views.StartDeployment.as_view(), name="deployment.start"),
-    url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/deployment/(?P<deployment>\d+)/$", views.DeploymentView.as_view(), name="deployment"),
+    # General
+    url(r"^$", login_required(views.Dashboard.as_view()), name="dashboard"),
+    url(r"^settings$", login_required(views.SettingsView.as_view()), name="settings"),
+
+    # Repositories
+    url(r"^create-repository$", login_required(views.CreateRepository.as_view()), name="repository.create"),
+    url(r"^repository/(?P<repo>[\w\.\-]+)/$", login_required(views.RepositoryView.as_view()), name="repository"),
+    url(r"^repository/(?P<repo>[\w\.\-]+)/start-build$", login_required(views.StartBuild.as_view()), name="build.start"),
+    url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/$", login_required(views.BuildView.as_view()), name="build"),
+    url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/start-test$", login_required(views.StartTest.as_view()), name="test.start"),
+    url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/test/(?P<test>\d+)/$", login_required(views.TestView.as_view()), name="test"),
+    url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/start-deployment/(?P<destination>[\w\.\-]+)$", login_required(views.StartDeployment.as_view()), name="deployment.start"),
+    url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/deployment/(?P<deployment>\d+)/$", login_required(views.DeploymentView.as_view()), name="deployment"),
 
 ]

@@ -1,8 +1,10 @@
 import os
+import sys
 
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
+BROKER_URL = 'amqp://guest:guest@rabbitmq:5672//'
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "asgi_ipc.IPCChannelLayer",
@@ -18,16 +20,14 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SHIPMASTER_DATA = "/var/lib/shipmaster"
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/1.9/howto/deployment/checklist/
-
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = '*z_fl)u0=5ovn-v2gp)c!=f6kux^da)h()-7y)f!7odle_+w=5'
 
 AUTH_USER_MODEL = 'server.User'
+LOGIN_URL = 'login'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', False)
 
 ALLOWED_HOSTS = []
 
@@ -53,7 +53,6 @@ MIDDLEWARE_CLASSES = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'shipmaster.server.middleware.AccessTokenUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_dartium.middleware.DartiumDetectionMiddleware',
@@ -61,9 +60,12 @@ MIDDLEWARE_CLASSES = [
 ]
 
 AUTHENTICATION_BACKENDS = [
-    'shipmaster.server.auth.AccessTokenUserBackend',
-    'django.contrib.auth.backends.ModelBackend'
+    'django.contrib.auth.backends.ModelBackend',
 ]
+if 'migrate' not in sys.argv:
+    GITHUB_ORG = os.environ['GITHUB_ORG']
+    OAUTH_KEY = os.environ['OAUTH_KEY']  # Client ID
+    OAUTH_SECRET = os.environ['OAUTH_SECRET']  # Client Secret
 
 ROOT_URLCONF = 'shipmaster.server.urls'
 

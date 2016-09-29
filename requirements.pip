@@ -3,7 +3,6 @@ channels
 asgi_ipc
 django-bootstrap-form
 django-dartium
-requests==2.7
 requests_oauthlib
 celery
 -e .

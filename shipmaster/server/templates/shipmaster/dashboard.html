@@ -1,6 +1,7 @@
 {% extends "shipmaster/base.html" %}
 
 {% block content %}
+  {% if user.is_authenticated %}
   <h1>Containers</h1>
   <ul>
     {% for container in containers %}
@@ -10,4 +11,7 @@
       </li>
     {% endfor %}
   </ul>
+  {% else %}
+   <a href="{% url 'login' %}">Login with GitHub</a>
+  {% endif %}
 {% endblock %}

@@ -94,13 +94,15 @@ class LogStreamingService:
 
 class LogSubscriptionConsumer(JsonWebsocketConsumer):
 
+    http_user = True
     strict_ordering = True
 
     def connect(self, message, **kwargs):
-        Channel(LogStreamingService.CHANNEL).send({
-            'subscriber': message.reply_channel.name,
-            'log': kwargs['path']
-        })
+        if message.user.is_authenticated:
+            Channel(LogStreamingService.CHANNEL).send({
+                'subscriber': message.reply_channel.name,
+                'log': kwargs['path']
+            })
 
 
 def setup(channels):
