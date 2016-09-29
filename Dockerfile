@@ -14,6 +14,7 @@ RUN pub build
 WORKDIR /usr/lib/shipmaster
 RUN pip3 install -r requirements.pip
 RUN python3 manage.py migrate
+RUN python3 manage.py collectstatic --noinput
 
 EXPOSE 8000
-ENTRYPOINT ["uwsgi", "--module=shipmaster.server.wsgi", "--socket=0.0.0.0:8000", "--static-map", "/static=/static", "--attach-daemon=celery -A shipmaster.server worker -B"]
+ENTRYPOINT ["uwsgi", "--module=shipmaster.server.wsgi", "--socket=0.0.0.0:8000", "--static-map", "/static=/usr/lib/shipmaster/static", "--attach-daemon=celery -A shipmaster.server worker -B"]
