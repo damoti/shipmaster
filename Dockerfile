@@ -19,4 +19,4 @@ RUN python3 manage.py migrate
 RUN python3 manage.py collectstatic --noinput
 
 EXPOSE 8000
-ENTRYPOINT ["uwsgi", "--module=shipmaster.server.wsgi", "--socket=0.0.0.0:8000", "--static-map", "/static=/usr/lib/shipmaster/static", "--attach-daemon=celery -A shipmaster.server worker -B", "--attach-daemon=/usr/sbin/rabbitmq-server"]
+ENTRYPOINT ["uwsgi", "--http-websockets", "--module=shipmaster.server.wsgi", "--socket=0.0.0.0:8000", "--static-map", "/static=/usr/lib/shipmaster/static", "--attach-daemon=celery -A shipmaster.server worker -B", "--attach-daemon=/usr/sbin/rabbitmq-server"]
