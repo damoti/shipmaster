@@ -38,9 +38,11 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser, PermissionsMixin):
     username = models.CharField(_('username'), max_length=120, unique=True)
-    name = models.CharField(_('full name'), max_length=120, blank=True)
+    name = models.CharField(_('full name'), max_length=1024, blank=True)
     email = models.EmailField(_('email address'), blank=True)
-    avatar = models.CharField(_('avatar'), max_length=1024)
+    avatar = models.CharField(_('avatar'), max_length=1024, blank=True)
+    profile_url = models.CharField(_('profile url'), max_length=1024, blank=True)
+    location = models.CharField(_('location'), max_length=1024, blank=True)
     json = models.TextField(_('json'))
 
     objects = UserManager()
