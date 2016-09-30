@@ -63,7 +63,6 @@ def build_app(path):
         )
         if result != 0:
             return build.failed()
-        build.succeeded()
     except:
         logger.exception("Git clone process threw an exception:")
         return build.failed()
@@ -73,15 +72,49 @@ def build_app(path):
     build.build_started()
     try:
         project = build.get_project()
+        if not project.base.exists():
+            result = project.base.build()
+            if result != 0:
+                return build.failed()
         result = project.app.build()
         if result != 0:
             return build.failed()
-        build.succeeded()
     except:
         logger.exception("Build process threw an exception:")
-        build.failed()
+        return build.failed()
     finally:
         build.build_finished()
+
+    build.succeeded()
+
+    if build.pull_request:
+        Test.create(build).test()
+
+
+@shared_task
+def test_app(path):
+    test = Test.from_path(path)
+    _replace_handler(FileHandler(test.path.log))
+    project = test.get_project()
+    compose = test.get_compose(project)
+    test.started()
+    try:
+        result = project.test.build()
+        if result != 0:
+            return test.failed()
+        result = project.test.run(compose)
+        if result != 0:
+            return test.failed()
+    except:
+        logger.exception("Test process threw an exception:")
+        return test.failed()
+    finally:
+        test.finished()
+
+    test.succeeded()
+
+    if test.build.pull_request:
+        Deployment.create(test.build, 'sandbox').deploy()
 
 
 @shared_task
@@ -95,34 +128,15 @@ def deploy_app(path):
             deployment.shipmaster.infrastructure.compose,
             deployment.destination
         )
-        deployment.failed() if result != 0 else deployment.succeeded()
+        if result != 0:
+            return deployment.failed()
     except:
         logger.exception("Deployment process threw an exception:")
-        deployment.failed()
+        return deployment.failed()
     finally:
         deployment.finished()
 
-
-@shared_task
-def test_app(path):
-    test = Test.from_path(path)
-    _replace_handler(FileHandler(test.path.log))
-    compose = test.get_compose()
-    project = test.get_project()
-    test.started()
-    try:
-        result = project.test.build()
-        if result != 0:
-            return test.failed()
-        result = project.test.run(compose)
-        if result != 0:
-            return test.failed()
-        test.succeeded()
-    except:
-        logger.exception("Test process threw an exception:")
-        test.failed()
-    finally:
-        test.finished()
+    deployment.succeeded()
 
 
 @shared_task
@@ -137,9 +151,12 @@ def sync_infrastructure(path):
             result = run(["git", "pull"], cwd=infra.path.src, env=git_ssh_command)
         else:
             result = run(["git", "clone", infra.project_git, infra.path.src], env=git_ssh_command)
-        infra.failed() if result != 0 else infra.succeeded()
+        if result != 0:
+            return infra.failed()
     except:
         logger.exception("Failed to update infrastructure sources:")
-        infra.failed()
+        return infra.failed()
     finally:
         infra.checkout_finished()
+
+    infra.succeeded()

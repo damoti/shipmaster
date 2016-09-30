@@ -1,11 +1,13 @@
 from requests_oauthlib import OAuth2Session
+from django_github_webhook.views import WebHookView
 from oauthlib.oauth2.rfc6749.errors import MismatchingStateError
 from django.views.generic import View
 from django.core.urlresolvers import reverse
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponse
 from django.conf import settings
 from django.contrib.auth import login
 
+from .models import Repository, Build
 from .user import User
 
 
@@ -56,33 +58,14 @@ class GitHubAuthorized(GitHub):
         return HttpResponseRedirect(reverse('dashboard'))
 
 
-class GitHubEvent(GitHub):
+class GitHubEvent(WebHookView):
+    secret = settings.WEBHOOK_SECRET
 
-    def get(self, request, *args, **kwargs):
-        state = request.session[self.SESSION_STATE]
-        github = OAuth2Session(settings.OAUTH_KEY, state=state)
+    @staticmethod
+    def push(payload, request):
+        repo_name = payload['repository']['name']
+        branch_name = payload['ref'].split('/')[-1]
+        repo = Repository.load(request.shipmaster, repo_name)
+        Build.create(repo, branch_name, pull_request=True).build()
+        return {'status': 'received'}
 
-        github.fetch_token(
-            self.TOKEN_URL,
-            client_secret=settings.OAUTH_SECRET,
-            authorization_response=request.url
-        )
-
-        data = github.get('https://api.github.com/user').json()
-
-        user = User.get_or_create(username=data['login'])
-        user.name = data['name']
-        user.email = data['email']
-        user.avatar = data['avatar_url']
-        user.json = data
-        user.save()
-
-        login(request, user)
-
-        return HttpResponseRedirect(reverse('dashboard'))
-
-
-class UrlPatterns:
-    urlpatterns = [
-    ]
-urls = UrlPatterns()

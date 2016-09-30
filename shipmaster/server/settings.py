@@ -1,6 +1,14 @@
 import os
 import sys
 
+SHIPMASTER_DATA = "/var/lib/shipmaster"
+
+GITHUB_ORG = os.environ.get('GITHUB_ORG')
+OAUTH_KEY = os.environ.get('OAUTH_KEY')  # Client ID
+OAUTH_SECRET = os.environ.get('OAUTH_SECRET')  # Client Secret
+WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET')
+
+
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
@@ -17,8 +25,6 @@ CHANNEL_LAYERS = {
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-SHIPMASTER_DATA = "/var/lib/shipmaster"
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = '*z_fl)u0=5ovn-v2gp)c!=f6kux^da)h()-7y)f!7odle_+w=5'
@@ -62,9 +68,6 @@ MIDDLEWARE_CLASSES = [
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
-GITHUB_ORG = os.environ.get('GITHUB_ORG')
-OAUTH_KEY = os.environ.get('OAUTH_KEY')  # Client ID
-OAUTH_SECRET = os.environ.get('OAUTH_SECRET')  # Client Secret
 
 ROOT_URLCONF = 'shipmaster.server.urls'
 

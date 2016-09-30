@@ -409,6 +409,10 @@ class Build(YamlModel):
 
     parent_class = Repository
 
+    RUNNING = 'running'
+    SUCCEEDED = 'succeeded'
+    FAILED = 'failed'
+
     def __init__(self, repo, number, **kwargs):
         super().__init__(**kwargs)
         self.repo = repo  # type: Repository
@@ -417,8 +421,8 @@ class Build(YamlModel):
         self.path = BuildPath(repo, number)
 
     @classmethod
-    def create(cls, repo, branch):
-        build = cls(repo, repo.increment_build_number(), branch=branch)
+    def create(cls, repo, branch, **kwargs):
+        build = cls(repo, repo.increment_build_number(), branch=branch, **kwargs)
         os.mkdir(build.path.absolute)
         os.mkdir(build.path.tests)
         os.mkdir(build.path.deployments)
@@ -437,6 +441,7 @@ class Build(YamlModel):
 
     @property
     def result(self):
+        """ Optional mutable field, updated after the build completes. """
         return self.dict.get('result', '')
 
     @result.setter
@@ -445,22 +450,26 @@ class Build(YamlModel):
 
     @property
     def branch(self):
+        """ Required immutable field, set when the build is created. """
         return self.dict['branch']
 
-    @branch.setter
-    def branch(self, branch):
-        self.dict['branch'] = branch
+    @property
+    def pull_request(self):
+        """ Optional immutable field, set when the build is created. """
+        return self.dict.get('pull_request', False)
 
-    def get_project(self):
+    def get_project(self, **extra):
         return Project(
             ProjectConf.from_workspace(self.path.workspace),
             build_num=self.number, ssh_config=self.shipmaster.path.ssh_config,
-            commit_info=self.commit_info
+            commit_info=self.commit_info, **extra
         )
 
     def build(self):
         from .tasks import build_app
         build_app.delay(self.path.absolute)
+        self.result = self.RUNNING
+        self.save()
         return self
 
     @property
@@ -483,12 +492,20 @@ class Build(YamlModel):
 
     # Timers & Progress
 
-    def failed(self):
-        self.result = 'failed'
-        self.save()
+    @property
+    def is_successful(self):
+        return self.result == self.SUCCEEDED
 
     def succeeded(self):
-        self.result = 'succeeded'
+        self.result = self.SUCCEEDED
+        self.save()
+
+    @property
+    def has_failed(self):
+        return self.result == self.FAILED
+
+    def failed(self):
+        self.result = self.FAILED
         self.save()
 
     @property
@@ -582,6 +599,10 @@ class BaseJobPath(YamlPath):
 
 class BaseJob(YamlModel):
 
+    RUNNING = 'running'
+    SUCCEEDED = 'succeeded'
+    FAILED = 'failed'
+
     parent_class = Build
 
     def __init__(self, build, number, **kwargs):
@@ -592,7 +613,7 @@ class BaseJob(YamlModel):
         self.number = str(number)
 
     def get_project(self):
-        return self.build.get_project()
+        return self.build.get_project(job_num=self.number)
 
     @property
     def result_display(self):
@@ -606,12 +627,20 @@ class BaseJob(YamlModel):
     def result(self, result):
         self.dict['result'] = result
 
-    def failed(self):
-        self.result = 'failed'
-        self.save()
+    @property
+    def is_successful(self):
+        return self.result == self.SUCCEEDED
 
     def succeeded(self):
-        self.result = 'succeeded'
+        self.result = self.SUCCEEDED
+        self.save()
+
+    @property
+    def has_failed(self):
+        return self.result == self.FAILED
+
+    def failed(self):
+        self.result = self.FAILED
         self.save()
 
     @property
@@ -687,6 +716,8 @@ class Deployment(BaseJob):
     def deploy(self):
         from .tasks import deploy_app
         deploy_app.delay(self.path.absolute)
+        self.result = self.RUNNING
+        self.save()
         return self
 
 
@@ -704,10 +735,10 @@ class Test(BaseJob):
         super().__init__(build, number, **kwargs)
         self.path = TestPath(build, number)
 
-    @property
-    def get_compose(self):
+    def get_compose(self, project):
         return get_compose(
             self.build.path.workspace,
+            project_name=project.test_name,
             host='unix://var/run/docker.sock'
         )
 
@@ -721,6 +752,8 @@ class Test(BaseJob):
     def test(self):
         from .tasks import test_app
         test_app.delay(self.path.absolute)
+        self.result = self.RUNNING
+        self.save()
         return self
 
 

@@ -4,9 +4,11 @@ services:
     build: .
     image: damoti/shipmaster
     environment:
+      DEBUG: Aye
       GITHUB_ORG: ''
       OAUTH_KEY: ''
       OAUTH_SECRET: ''
+      WEBHOOK_SECRET: ''
     ports:
       - "8000:8000"
     volumes:
