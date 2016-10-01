@@ -781,6 +781,10 @@ class TestPath(BaseJobPath):
     def absolute(self):
         return os.path.join(self.build.path.tests, self.number)
 
+    @property
+    def reports(self):
+        return os.path.join(self.absolute, 'reports')
+
 
 class Test(BaseJob):
 
@@ -812,6 +816,7 @@ class Test(BaseJob):
     def create(cls, build):
         job = cls(build, build.increment_test_number())
         os.mkdir(job.path.absolute)
+        os.mkdir(job.path.reports)
         job.save()
         return job
 

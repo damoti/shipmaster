@@ -102,7 +102,7 @@ def test_app(path):
         result = project.test.build()
         if result != 0:
             return test.failed()
-        result = project.test.run(compose)
+        result = project.test.run(compose, test.path.reports)
         if result != 0:
             return test.failed()
     except:

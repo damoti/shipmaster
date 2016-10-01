@@ -357,7 +357,7 @@ class TestLayer(LayerBase):
 
         return self.start_and_commit(self.create(script), cmd=self.layer.start)
 
-    def run(self, compose: ComposeProject):
+    def run(self, compose: ComposeProject, reports=None):
 
         logger.info('Running tests in {}...'.format(self.image_name))
 
@@ -369,6 +369,11 @@ class TestLayer(LayerBase):
         if self.is_editable:
             self.volumes.append(
                 "{}:{}".format(os.getcwd(), APP_PATH)
+            )
+
+        if reports:
+            self.volumes.append(
+                "{}:{}".format(reports, os.path.join(APP_PATH, 'reports'))
             )
 
         container = service.create_container(
