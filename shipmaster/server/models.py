@@ -90,6 +90,8 @@ class Shipmaster(YamlModel):
     def __init__(self, data_path, **kwargs):
         super().__init__(**kwargs)
         self.path = ShipmasterPath(data_path)
+        if not os.path.exists(self.path.yaml):
+            self.save()
 
     @classmethod
     def from_path(cls, path):
