@@ -4,6 +4,7 @@ asgi_ipc
 django-dartium
 django-bootstrap-form
 django-github-webhook
+--pre github3.py
 requests_oauthlib
 celery
 -e .

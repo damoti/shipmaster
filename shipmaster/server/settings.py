@@ -2,6 +2,7 @@ import os
 import sys
 
 SHIPMASTER_DATA = "/var/lib/shipmaster"
+BASE_URL = os.environ.get('BASE_URL', 'http://localhost:8000')
 
 GITHUB_ORG = os.environ.get('GITHUB_ORG')
 OAUTH_KEY = os.environ.get('OAUTH_KEY')  # Client ID

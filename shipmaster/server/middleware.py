@@ -5,7 +5,7 @@ class ShipmasterMiddleware:
 
     @staticmethod
     def process_view(request, view, args, kwargs):
-        request.shipmaster = Shipmaster('/var/lib/shipmaster')
+        request.shipmaster = Shipmaster.from_path('/var/lib/shipmaster')
         request.infrastructure = request.shipmaster.infrastructure
         request.current_repo = None
         request.current_build = None

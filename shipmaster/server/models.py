@@ -4,10 +4,14 @@ import json
 import time
 import shutil
 import subprocess
+from urllib.parse import urljoin
 from collections import OrderedDict
 from ruamel import yaml
 
+from github3 import GitHub
 from compose.cli.command import get_project as get_compose
+from django.core.urlresolvers import reverse
+from django.conf import settings
 
 from shipmaster.base.builder import Project
 from shipmaster.base.config import ProjectConf
@@ -32,8 +36,8 @@ class YamlModel:
         self.dict = OrderedDict(**kwargs)
 
     @classmethod
-    def load(cls, parent, name):
-        model = cls(parent, name)
+    def load(cls, *args):
+        model = cls(*args)
         with open(model.path.yaml, 'r') as file:
             model.dict = yaml.load(file)
         return model
@@ -49,18 +53,22 @@ class YamlModel:
             file.write(yaml.dump(self.dict))
 
 
-class ShipmasterPath:
+class ShipmasterPath(YamlPath):
 
-    def __init__(self, data_path):
-        self.data_path = data_path
+    def __init__(self, absolute):
+        self.absolute = absolute
+
+    @property
+    def yaml(self):
+        return os.path.join(self.absolute, 'config.yaml')
 
     @property
     def repos_dir(self):
-        return os.path.join(self.data_path, 'repos')
+        return os.path.join(self.absolute, 'repos')
 
     @property
     def ssh_dir(self):
-        return os.path.join(self.data_path, 'ssh')
+        return os.path.join(self.absolute, 'ssh')
 
     @property
     def keys_dir(self):
@@ -71,14 +79,21 @@ class ShipmasterPath:
         return os.path.join(self.ssh_dir, 'ssh_config')
 
 
-class Shipmaster:
+class GitHubStatusUpdater:
 
-    def __init__(self, data_path):
+    def __init__(self, oauth):
+        self.oauth = oauth
+
+
+class Shipmaster(YamlModel):
+
+    def __init__(self, data_path, **kwargs):
+        super().__init__(**kwargs)
         self.path = ShipmasterPath(data_path)
 
     @classmethod
     def from_path(cls, path):
-        return cls(path)
+        return cls.load(path)
 
     def update_ssh_config(self):
         with open(self.path.ssh_config, 'w') as config:
@@ -87,6 +102,35 @@ class Shipmaster:
                 config.write('  HostName '+repo.git_host+'\n')
                 config.write('  User git\n')
                 config.write('  IdentityFile '+repo.path.private_key+'\n')
+
+    def set_token_if_empty(self, token):
+        if not self.token:
+            self.token = token
+            self.save()
+
+    def get_github(self):
+        return GitHub(token=self.token)
+
+    @property
+    def token(self):
+        """ Shipmaster's integration with GitHub is a bit complicated
+            due to how the GitHub API works.
+
+            First, you have to register your Shipmaster installation as a
+            GitHub "OAuth application". This allows Shipmaster to fetch
+            access tokens for GitHub users and nothing else.
+
+            Second, to allow Shipmaster to actually perform any actions
+            inside of your GitHub organisation, it needs to be granted access
+            through an existing GitHub user. Therefore, the first user to
+            login-in to Shipmaster becomes the designated proxy user by which
+            Shipmaster will execute all future GitHub API calls.
+        """
+        return self.dict.get('token')
+
+    @token.setter
+    def token(self, token):
+        self.dict['token'] = token
 
     @property
     def repositories(self):
@@ -150,6 +194,10 @@ class Repository(YamlModel):
             self.git_host = m.group(1)
             self.git_account = m.group(2)
             self.git_repo = m.group(3)
+
+    def get_github(self):
+        github = self.shipmaster.get_github()
+        return github.repository(self.git_account, self.git_repo)
 
     @classmethod
     def load(cls, parent, name):
@@ -409,9 +457,16 @@ class Build(YamlModel):
 
     parent_class = Repository
 
-    RUNNING = 'running'
-    SUCCEEDED = 'succeeded'
-    FAILED = 'failed'
+    QUEUED = 'queued'
+    CLONING = 'cloning'
+    BUILDING = 'pending'
+    SUCCEEDED = 'success'
+    FAILED = 'failure'
+    GITHUB_STATES = {
+        BUILDING: "building...",
+        SUCCEEDED: "container built",
+        FAILED: "build failed"
+    }
 
     def __init__(self, repo, number, **kwargs):
         super().__init__(**kwargs)
@@ -436,6 +491,13 @@ class Build(YamlModel):
         return increment_number_file(self.path.last_deployment_number)
 
     @property
+    def url(self):
+        return urljoin(
+            settings.BASE_URL,
+            reverse('build', args=[self.repo.name, self.number])
+        )
+
+    @property
     def result_display(self):
         return self.result.capitalize()
 
@@ -446,6 +508,14 @@ class Build(YamlModel):
 
     @result.setter
     def result(self, result):
+        if result in self.GITHUB_STATES:
+            sha = self.commit_info['hash']
+            repo = self.repo.get_github()
+            repo.create_status(
+                sha, result, target_url=self.url,
+                description=self.GITHUB_STATES[result],
+                context='shipmaster/build',
+            )
         self.dict['result'] = result
 
     @property
@@ -466,10 +536,10 @@ class Build(YamlModel):
         )
 
     def build(self):
+        self.result = self.QUEUED
+        self.save()
         from .tasks import build_app
         build_app.delay(self.path.absolute)
-        self.result = self.RUNNING
-        self.save()
         return self
 
     @property
@@ -533,6 +603,8 @@ class Build(YamlModel):
     def cloning_started(self):
         assert not self.has_cloning_started
         record_time(self.path.clone_begin)
+        self.result = self.CLONING
+        self.save()
 
     def cloning_finished(self):
         assert not self.has_cloning_finished
@@ -562,6 +634,8 @@ class Build(YamlModel):
     def build_started(self):
         assert not self.has_build_started
         record_time(self.path.build_begin)
+        self.result = self.BUILDING
+        self.save()
 
     def build_finished(self):
         assert not self.has_build_finished
@@ -599,9 +673,11 @@ class BaseJobPath(YamlPath):
 
 class BaseJob(YamlModel):
 
-    RUNNING = 'running'
-    SUCCEEDED = 'succeeded'
-    FAILED = 'failed'
+    QUEUED = 'queued'
+    RUNNING = 'pending'
+    SUCCEEDED = 'success'
+    FAILED = 'failure'
+    GITHUB_STATES = {}
 
     parent_class = Build
 
@@ -616,6 +692,10 @@ class BaseJob(YamlModel):
         return self.build.get_project(job_num=self.number)
 
     @property
+    def url(self):
+        raise NotImplemented
+
+    @property
     def result_display(self):
         return self.result.capitalize()
 
@@ -625,6 +705,15 @@ class BaseJob(YamlModel):
 
     @result.setter
     def result(self, result):
+        if result in self.GITHUB_STATES:
+            sha = self.build.commit_info['hash']
+            repo = self.repo.get_github()
+            description = self.GITHUB_STATES[result].format(o=self)
+            repo.create_status(
+                sha, result, target_url=self.url,
+                description=description,
+                context='shipmaster/{}'.format(self.path.job_type),
+            )
         self.dict['result'] = result
 
     @property
@@ -654,6 +743,8 @@ class BaseJob(YamlModel):
     def started(self):
         assert not self.has_started
         record_time(self.path.begin)
+        self.result = self.RUNNING
+        self.save()
 
     def finished(self):
         assert not self.has_finished
@@ -683,6 +774,55 @@ class BaseJob(YamlModel):
         return self.__class__ == Test
 
 
+class TestPath(BaseJobPath):
+    job_type = 'test'
+
+    @property
+    def absolute(self):
+        return os.path.join(self.build.path.tests, self.number)
+
+
+class Test(BaseJob):
+
+    GITHUB_STATES = {
+        BaseJob.RUNNING: "running tests...",
+        BaseJob.SUCCEEDED: "tests passed",
+        BaseJob.FAILED: "tests failed"
+    }
+
+    def __init__(self, build, number, **kwargs):
+        super().__init__(build, number, **kwargs)
+        self.path = TestPath(build, number)
+
+    def get_compose(self, project):
+        return get_compose(
+            self.build.path.workspace,
+            project_name=project.test_name,
+            host='unix://var/run/docker.sock'
+        )
+
+    @property
+    def url(self):
+        return urljoin(
+            settings.BASE_URL,
+            reverse('test', args=[self.repo.name, self.build.number, self.number])
+        )
+
+    @classmethod
+    def create(cls, build):
+        job = cls(build, build.increment_test_number())
+        os.mkdir(job.path.absolute)
+        job.save()
+        return job
+
+    def test(self):
+        self.result = self.QUEUED
+        self.save()
+        from .tasks import test_app
+        test_app.delay(self.path.absolute)
+        return self
+
+
 class DeploymentPath(BaseJobPath):
     job_type = 'deployment'
 
@@ -692,6 +832,12 @@ class DeploymentPath(BaseJobPath):
 
 
 class Deployment(BaseJob):
+
+    GITHUB_STATES = {
+        BaseJob.RUNNING: "'{o.destination}' deploying...",
+        BaseJob.SUCCEEDED: "'{o.destination}' deployment done",
+        BaseJob.FAILED: "'{o.destination}' deployment failed"
+    }
 
     def __init__(self, build, number, **kwargs):
         super().__init__(build, number, **kwargs)
@@ -706,6 +852,13 @@ class Deployment(BaseJob):
         return job
 
     @property
+    def url(self):
+        return urljoin(
+            settings.BASE_URL,
+            reverse('deployment', args=[self.repo.name, self.build.number, self.number])
+        )
+
+    @property
     def destination(self):
         return self.dict['destination']
 
@@ -714,46 +867,10 @@ class Deployment(BaseJob):
         self.dict['destination'] = destination
 
     def deploy(self):
+        self.result = self.QUEUED
+        self.save()
         from .tasks import deploy_app
         deploy_app.delay(self.path.absolute)
-        self.result = self.RUNNING
-        self.save()
-        return self
-
-
-class TestPath(BaseJobPath):
-    job_type = 'test'
-
-    @property
-    def absolute(self):
-        return os.path.join(self.build.path.tests, self.number)
-
-
-class Test(BaseJob):
-
-    def __init__(self, build, number, **kwargs):
-        super().__init__(build, number, **kwargs)
-        self.path = TestPath(build, number)
-
-    def get_compose(self, project):
-        return get_compose(
-            self.build.path.workspace,
-            project_name=project.test_name,
-            host='unix://var/run/docker.sock'
-        )
-
-    @classmethod
-    def create(cls, build):
-        job = cls(build, build.increment_test_number())
-        os.mkdir(job.path.absolute)
-        job.save()
-        return job
-
-    def test(self):
-        from .tasks import test_app
-        test_app.delay(self.path.absolute)
-        self.result = self.RUNNING
-        self.save()
         return self
 
 

@@ -52,7 +52,7 @@ class GitHubAuthorized(GitHub):
         if state != request.GET['state']:
             raise MismatchingStateError()
 
-        github.fetch_token(
+        token = github.fetch_token(
             self.TOKEN_URL,
             code=request.GET['code'],
             client_secret=settings.OAUTH_SECRET,
@@ -82,6 +82,8 @@ class GitHubAuthorized(GitHub):
         user.save()
 
         login(request, user)
+
+        request.shipmaster.set_token_if_empty(token['access_token'])
 
         return HttpResponseRedirect(reverse('dashboard'))
 

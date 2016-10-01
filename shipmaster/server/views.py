@@ -100,10 +100,9 @@ class BuildView(TemplateView):
 class StartDeployment(View):
 
     def get(self, request, *args, **kwargs):
-        repo = request.current_repo
         build = request.current_build
         job = Deployment.create(build, kwargs['destination']).deploy()
-        return HttpResponseRedirect(reverse('deployment', args=[repo.name, build.number, job.number]))
+        return HttpResponseRedirect(job.url)
 
 
 class DeploymentView(TemplateView):
@@ -117,10 +116,9 @@ class DeploymentView(TemplateView):
 class StartTest(View):
 
     def get(self, request, *args, **kwargs):
-        repo = request.current_repo
         build = request.current_build
         job = Test.create(build).test()
-        return HttpResponseRedirect(reverse('test', args=[repo.name, build.number, job.number]))
+        return HttpResponseRedirect(job.url)
 
 
 class TestView(TemplateView):
