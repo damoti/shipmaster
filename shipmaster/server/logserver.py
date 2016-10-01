@@ -4,8 +4,9 @@ from channels import Channel
 from channels.generic.websockets import JsonWebsocketConsumer
 from twisted.internet.epollreactor import EPollReactor
 from twisted.internet import reactor as _reactor; reactor = _reactor  # type: EPollReactor
+from django.conf import settings
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('shipmaster.logserver')
 
 
 class LogFileState:
@@ -36,6 +37,10 @@ class LogFileState:
                 return False
         return True
 
+    def close(self):
+        if self.file:
+            self.file.close()
+
     def read(self):
         if not self.open():
             return False
@@ -55,11 +60,16 @@ class LogFileState:
 
 class LogStreamingService:
 
-    CHANNEL = "logservice.subscribe"
+    SUBSCRIBE = "logservice.subscribe"
+    UNSUBSCRIBE = "logservice.unsubscribe"
 
     def __init__(self, channel_layer):
         self.channel_layer = channel_layer
         self.logs = {}  # type: Dict[str, LogFileState]
+        self.counter = 0
+        if settings.DEBUG:
+            logger.setLevel(logging.DEBUG)
+            logger.addHandler(logging.StreamHandler())
 
     def start(self):
         logger.info("Starting Shipmaster Log Interface Service")
@@ -67,23 +77,49 @@ class LogStreamingService:
 
     def loop(self):
 
-        # First handle any log updates.
-        for file in self.logs.values():
-            if file.read():
-                for subscriber in file.subscribers:
-                    self.channel_layer.send(subscriber, {'text': file.something})
-
-        # Now check if there are any new subscribers.
+        # First check unsubscribes so we don't send logs to closed connections.
         while True:
 
-            _, message = self.channel_layer.receive_many([self.CHANNEL])
+            _, message = self.channel_layer.receive_many([self.UNSUBSCRIBE])
 
             if not message:
                 break
 
             file = self.logs.get(message['log'])
+            if file and message['subscriber'] in file.subscribers:
+                logger.debug("Unsubscribing {} from {}.".format(
+                    message['subscriber'], message['log']
+                ))
+                file.subscribers.remove(message['subscriber'])
+                if len(file.subscribers) == 0:
+                    logger.debug("Closing {}.".format(file.path))
+                    file.close()
+                    del self.logs[file.path]
+
+        # Send log updates.
+        for file in self.logs.values():
+            if file.read():
+                logger.debug("File {} moved {} to position {}...".format(file.path, len(file.something), file.position))
+                for subscriber in file.subscribers:
+                    logger.debug("  Sending to: {}".format(subscriber))
+                    self.channel_layer.send(subscriber, {'text': file.something})
+
+        # Now check if there are any new subscribers.
+        while True:
+
+            _, message = self.channel_layer.receive_many([self.SUBSCRIBE])
+
+            if not message:
+                break
+
+            logger.debug("New subscriber {} for {}.".format(
+                message['subscriber'], message['log']
+            ))
+
+            file = self.logs.get(message['log'])
             if file is None:
                 self.logs[message['log']] = file = LogFileState(message['log'])
+                logger.debug("Opened log {}.".format(file.path))
                 file.read()
 
             file.subscribers.append(message['subscriber'])
@@ -99,10 +135,16 @@ class LogSubscriptionConsumer(JsonWebsocketConsumer):
 
     def connect(self, message, **kwargs):
         if message.user.is_authenticated:
-            Channel(LogStreamingService.CHANNEL).send({
+            Channel(LogStreamingService.SUBSCRIBE).send({
                 'subscriber': message.reply_channel.name,
                 'log': kwargs['path']
             })
+
+    def disconnect(self, message, **kwargs):
+        Channel(LogStreamingService.UNSUBSCRIBE).send({
+            'subscriber': message.reply_channel.name,
+            'log': kwargs['path']
+        })
 
 
 def setup(channels):
