@@ -3,6 +3,8 @@ import sys
 
 SHIPMASTER_DATA = "/var/lib/shipmaster"
 BASE_URL = os.environ.get('BASE_URL', 'http://localhost:8000')
+ALLOWED_HOSTS = [BASE_URL.split('://')[1]]
+
 
 GITHUB_ORG = os.environ.get('GITHUB_ORG')
 OAUTH_KEY = os.environ.get('OAUTH_KEY')  # Client ID
@@ -35,9 +37,6 @@ LOGIN_URL = 'login'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', False)
-
-ALLOWED_HOSTS = []
-
 
 # Application definition
 
