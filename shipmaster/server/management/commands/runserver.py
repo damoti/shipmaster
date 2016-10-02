@@ -6,5 +6,5 @@ from shipmaster.server.logserver import setup
 class Command(RunserverCommand):
 
     def inner_run(self, *args, **options):
-        setup(channel_layers[DEFAULT_CHANNEL_LAYER])
+        setup(channel_layers[DEFAULT_CHANNEL_LAYER], self.verbosity)
         super().inner_run(*args, **options)

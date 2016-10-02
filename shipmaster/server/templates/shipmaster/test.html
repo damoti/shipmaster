@@ -8,6 +8,9 @@
     <div class="mdl-card mdl-shadow--2dp">
       <div class="mdl-card__supporting-text">
         <h4>Test #{{ current_job.number }}</h4>
+        {% if current_job.has_finished %}
+        <a href="{% url "test.reports" current_repo.name current_build.number current_job.number 'index.html' %}">Test Report</a>
+        {% endif %}
       </div>
     </div>
 

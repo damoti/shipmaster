@@ -2,22 +2,31 @@ import os
 import select
 import logging
 import subprocess
-from logging import FileHandler, INFO, ERROR
+from logging import FileHandler
 from .models import Build, Deployment, Test, Infrastructure
 from celery import shared_task
+
 
 logger = logging.getLogger('shipmaster')
 _LOG_HANDLER = None
 
 
+def _disable_others():
+    logging.getLogger('github3').setLevel(logging.WARNING)
+    logging.getLogger('requests').setLevel(logging.WARNING)
+
+
 def _replace_handler(handler):
-    logger.setLevel(logging.INFO)
     global _LOG_HANDLER
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
     if _LOG_HANDLER:
         _LOG_HANDLER.close()
-        logger.removeHandler(_LOG_HANDLER)
+        root.removeHandler(_LOG_HANDLER)
+    else:
+        _disable_others()
     _LOG_HANDLER = handler
-    logger.addHandler(handler)
+    root.addHandler(handler)
 
 
 def run(command, cwd=None, env=None):
@@ -30,8 +39,8 @@ def run(command, cwd=None, env=None):
         cwd=cwd, env=env, universal_newlines=True
     )
 
-    log_level = {child.stdout: INFO,
-                 child.stderr: ERROR}
+    log_level = {child.stdout: logging.INFO,
+                 child.stderr: logging.ERROR}
 
     def check_io():
         ready_to_read = select.select([child.stdout, child.stderr], [], [], 1000)[0]

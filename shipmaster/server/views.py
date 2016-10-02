@@ -1,8 +1,10 @@
 from subprocess import CalledProcessError
-from django.http import HttpResponse
+from django.http import HttpResponse, FileResponse
 from django.http import HttpResponseRedirect
 from django.views.generic import View, TemplateView, FormView
+from django.views.generic.base import TemplateResponseMixin
 from django.core.urlresolvers import reverse
+from django.core.exceptions import ViewDoesNotExist
 
 from docker import Client
 
@@ -127,6 +129,37 @@ class TestView(TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data()
         return context
+
+
+class TestReports(TemplateResponseMixin, View):
+    template_name = "shipmaster/test_report_page.html"
+
+    def get(self, request, *args, **kwargs):
+        test = request.current_job
+
+        report = kwargs.get('report') or 'index.html'
+
+        if test.is_valid_report_file(report):
+
+            if report.endswith('.html'):
+                file = test.get_report_file(report)
+                context = {
+                    'view': self,
+                    'page': report,
+                    'html': file.read(),
+                }
+                file.close()
+                return self.render_to_response(context)
+
+            elif report.endswith('.css'):
+                file = test.get_report_file(report, 'rb')
+                return FileResponse(file, content_type='text/css')
+
+            else:
+                file = test.get_report_file(report, 'rb')
+                return FileResponse(file)
+
+        raise ViewDoesNotExist(report)
 
 
 class SettingsView(TemplateView):

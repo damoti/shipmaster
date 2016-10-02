@@ -17,9 +17,9 @@
       <h4>Test</h4>
       <p>Test runs against this build.</p>
       <ul>
-        {% for job in current_build.sorted_tests %}
+        {% for test in current_build.sorted_tests %}
           <li>
-            <a href="{% url "test" current_repo.name current_build.number job.number %}">Test Run # {{ job.number }} {{ job.result_display }}</a>
+            <a href="{% url "test" current_repo.name current_build.number test.number %}">Test Run # {{ test.number }} {{ test.result_display }} {{ test.coverage_display }}</a>
           </li>
         {% endfor %}
       </ul>

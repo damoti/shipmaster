@@ -11,7 +11,7 @@ from requests.packages.urllib3.exceptions import ReadTimeoutError
 from .config import ProjectConf, LayerConf
 from .script import Archive, Script, SCRIPT_PATH, APP_PATH
 
-logger = logging.getLogger('shipmaster')
+logger = logging.getLogger('shipmaster.builder')
 
 
 class Project:
@@ -151,7 +151,7 @@ class BaseLayer(LayerBase):
         return script
 
     def build(self):
-        logger.info('Building: {} FROM {}'.format(self.image_name, self.from_image))
+        logger.info('BUILDING {} FROM {}'.format(self.image_name, self.from_image))
 
         script = self.get_script()
         self.archive.add_script(script)
@@ -193,7 +193,7 @@ class AppLayer(LayerBase):
 
     def build(self):
 
-        logger.info('Building: {} FROM {}'.format(self.image_name, self.from_image))
+        logger.info('BUILDING {} FROM {}'.format(self.image_name, self.from_image))
 
         script = self.get_script()
         self.archive.add_script(script)
@@ -342,7 +342,7 @@ class TestLayer(LayerBase):
 
     def build(self):
 
-        logger.info('Building: {} FROM {}'.format(self.image_name, self.from_image))
+        logger.info('BUILDING {} FROM {}'.format(self.image_name, self.from_image))
 
         script = self.get_script()
         self.archive.add_script(script)
@@ -351,20 +351,30 @@ class TestLayer(LayerBase):
             self.volumes.append(
                 "{}:{}".format(os.getcwd(), APP_PATH)
             )
-        else:
-            for file in self.layer.context:
-                self.archive.add_project_file(file)
 
-        return self.start_and_commit(self.create(script), cmd=self.layer.start)
+        start_command = self.layer.start
+        if self.layer.wait_for:
+            start_command = "{} {} -- {}".format(
+                os.path.join(SCRIPT_PATH, "wait-for-it/wait-for-it.sh"),
+                self.layer.wait_for,
+                start_command
+            )
+
+        return self.start_and_commit(self.create(script), cmd=start_command)
 
     def run(self, compose: ComposeProject, reports=None):
-
         logger.info('Running tests in {}...'.format(self.image_name))
-
-        # Make sure the custom network is up
-        compose.initialize()
-
         service = compose.get_service('test')  # type: Service
+        compose.up(service.get_dependency_names())
+        try:
+            return self._run_test_container(service, reports)
+        finally:
+            # Stop and delete containers but don't remove any images
+            compose.down(None, include_volumes=True)
+            # Finally remove just the test image
+            service.remove_image(service.image_name)
+
+    def _run_test_container(self, service, reports):
 
         if self.is_editable:
             self.volumes.append(
@@ -378,22 +388,16 @@ class TestLayer(LayerBase):
 
         container = service.create_container(
             one_off=True,
-            command=['/bin/sh', '-c', self.layer.start],
             volumes=map(VolumeSpec.parse, self.volumes),
             environment=self.environment,
         )
-
-        compose.up(service.get_dependency_names())
-
-        # TODO: Need a more intelligent way to wait for dependencies to come up.
-        time.sleep(10)
 
         service.start_container(container)
         for line in container.logs(stream=True):
             logger.info(line.decode().rstrip())
 
         result = service.client.wait(container.id)
-        container.remove()
         if result != 0:
             logger.error("Test run failed.")
+
         return result

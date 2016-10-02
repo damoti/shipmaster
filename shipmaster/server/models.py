@@ -807,12 +807,50 @@ class Test(BaseJob):
             host='unix://var/run/docker.sock'
         )
 
+    def is_valid_report_file(self, path):
+        for file in os.listdir(self.path.reports):
+            if file == path:
+                return True
+        return False
+
+    def get_report_file(self, path, mode='r'):
+        absolute_path = os.path.join(self.path.reports, path)
+        return open(absolute_path, mode)
+
     @property
     def url(self):
         return urljoin(
             settings.BASE_URL,
             reverse('test', args=[self.repo.name, self.build.number, self.number])
         )
+
+    @property
+    def coverage_display(self):
+        if self.coverage:
+            return "{}% covered".format(self.coverage)
+        return ""
+
+    def calculate_coverage(self):
+        FILE = 'status.json'
+        if self.is_valid_report_file(FILE):
+            from coverage.results import Numbers
+            data = json.load(self.get_report_file(FILE))
+            stats = sum([Numbers(*file['index']['nums']) for file in data['files'].values()])
+            stats.set_precision(2)
+            return stats.pc_covered_str
+        return ''
+
+    def update_coverage(self):
+        self.coverage = self.calculate_coverage()
+        self.save()
+
+    @property
+    def coverage(self):
+        return self.dict.get('coverage', '')
+
+    @coverage.setter
+    def coverage(self, coverage):
+        self.dict['coverage'] = coverage
 
     @classmethod
     def create(cls, build):
@@ -828,6 +866,10 @@ class Test(BaseJob):
         from .tasks import test_app
         test_app.delay(self.path.absolute)
         return self
+
+    def succeeded(self):
+        self.update_coverage()
+        super().succeeded()
 
 
 class DeploymentPath(BaseJobPath):

@@ -21,6 +21,7 @@ urlpatterns = [
     url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/$", login_required(views.BuildView.as_view()), name="build"),
     url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/start-test$", login_required(views.StartTest.as_view()), name="test.start"),
     url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/test/(?P<test>\d+)/$", login_required(views.TestView.as_view()), name="test"),
+    url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/test/(?P<test>\d+)/reports/(?P<report>.+)?$", login_required(views.TestReports.as_view()), name="test.reports"),
     url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/start-deployment/(?P<destination>[\w\.\-]+)$", login_required(views.StartDeployment.as_view()), name="deployment.start"),
     url(r"^repository/(?P<repo>[\w\.\-]+)/build/(?P<build>\d+)/deployment/(?P<deployment>\d+)/$", login_required(views.DeploymentView.as_view()), name="deployment"),
 

@@ -1,12 +1,15 @@
 import logging
 from typing import Dict
 from channels import Channel
+from channels.log import handler
 from channels.generic.websockets import JsonWebsocketConsumer
 from twisted.internet.epollreactor import EPollReactor
 from twisted.internet import reactor as _reactor; reactor = _reactor  # type: EPollReactor
 from django.conf import settings
 
 logger = logging.getLogger('shipmaster.logserver')
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
 
 
 class LogFileState:
@@ -63,16 +66,18 @@ class LogStreamingService:
     SUBSCRIBE = "logservice.subscribe"
     UNSUBSCRIBE = "logservice.unsubscribe"
 
-    def __init__(self, channel_layer):
+    def __init__(self, channel_layer, verbosity):
         self.channel_layer = channel_layer
         self.logs = {}  # type: Dict[str, LogFileState]
         self.counter = 0
-        if settings.DEBUG:
+        if verbosity > 1:
             logger.setLevel(logging.DEBUG)
-            logger.addHandler(logging.StreamHandler())
 
     def start(self):
-        logger.info("Starting Shipmaster Log Interface Service")
+        logger.info(
+            "Shipmaster log service running, listening to channels: {}".format(
+                ', '.join([self.SUBSCRIBE, self.UNSUBSCRIBE])
+            ))
         self.loop()
 
     def loop(self):
@@ -101,7 +106,6 @@ class LogStreamingService:
             if file.read():
                 logger.debug("File {} moved {} to position {}...".format(file.path, len(file.something), file.position))
                 for subscriber in file.subscribers:
-                    logger.debug("  Sending to: {}".format(subscriber))
                     self.channel_layer.send(subscriber, {'text': file.something})
 
         # Now check if there are any new subscribers.
@@ -147,8 +151,8 @@ class LogSubscriptionConsumer(JsonWebsocketConsumer):
         })
 
 
-def setup(channels):
-    reactor.callLater(3, LogStreamingService(channels).start)
+def setup(channels, verbosity):
+    reactor.callLater(3, LogStreamingService(channels, verbosity).start)
 
 
 def run():
