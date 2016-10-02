@@ -73,3 +73,4 @@ class BuildConf:
     def __init__(self, conf, build):
         self.conf = conf
         self.branches = build.get('branches', ['master'])
+        self.pull_requests = build.get('pull_requests', True)
