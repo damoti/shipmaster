@@ -163,7 +163,7 @@ def run():
         format="%(asctime)-15s %(levelname)-8s %(message)s",
     )
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "shipmaster.server.settings")
-    LogStreamingService(channel_layer).start()
+    LogStreamingService(channel_layer, verbosity=1).start()
     reactor.run()
 
 
