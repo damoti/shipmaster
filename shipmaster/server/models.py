@@ -3,7 +3,9 @@ import re
 import json
 import time
 import shutil
+import requests
 import subprocess
+
 from urllib.parse import urljoin
 from collections import OrderedDict
 from ruamel import yaml
@@ -469,6 +471,7 @@ class Build(YamlModel):
         SUCCEEDED: "container built",
         FAILED: "build failed"
     }
+    SLACK_MESSAGES = GITHUB_STATES
 
     def __init__(self, repo, number, **kwargs):
         super().__init__(**kwargs)
@@ -510,15 +513,26 @@ class Build(YamlModel):
 
     @result.setter
     def result(self, result):
-        if result in self.GITHUB_STATES:
-            sha = self.commit_info['hash']
-            repo = self.repo.get_github()
-            repo.create_status(
-                sha, result, target_url=self.url,
-                description=self.GITHUB_STATES[result],
-                context='shipmaster/build',
-            )
         self.dict['result'] = result
+        self.save()
+
+        try:
+            if result in self.GITHUB_STATES:
+                sha = self.commit_info['hash']
+                repo = self.repo.get_github()
+                repo.create_status(
+                    sha, result, target_url=self.url,
+                    description=self.GITHUB_STATES[result],
+                    context='shipmaster/build',
+                )
+        except:
+            pass
+
+        try:
+            if result in self.SLACK_MESSAGES:
+                self.slack(self.SLACK_MESSAGES[result])
+        except:
+            pass
 
     @property
     def branch(self):
@@ -530,19 +544,26 @@ class Build(YamlModel):
         """ Optional immutable field, set when the build is created. """
         return self.dict.get('pull_request', False)
 
+    def get_conf(self):
+        return ProjectConf.from_workspace(self.path.workspace)
+
     def get_project(self, **extra):
         return Project(
-            ProjectConf.from_workspace(self.path.workspace),
+            self.get_conf(),
             build_num=self.number, ssh_config=self.shipmaster.path.ssh_config,
             commit_info=self.commit_info, **extra
         )
 
     def build(self):
         self.result = self.QUEUED
-        self.save()
         from .tasks import build_app
         build_app.delay(self.path.absolute)
         return self
+
+    def slack(self, message):
+        conf = self.get_conf()
+        if message and conf.slack.is_enabled:
+            requests.post(conf.slack.api, json.dumps({'text': message}))
 
     @property
     def tests(self):
@@ -570,7 +591,6 @@ class Build(YamlModel):
 
     def succeeded(self):
         self.result = self.SUCCEEDED
-        self.save()
 
     @property
     def has_failed(self):
@@ -578,7 +598,6 @@ class Build(YamlModel):
 
     def failed(self):
         self.result = self.FAILED
-        self.save()
 
     @property
     def commit_info(self):
@@ -606,7 +625,6 @@ class Build(YamlModel):
         assert not self.has_cloning_started
         record_time(self.path.clone_begin)
         self.result = self.CLONING
-        self.save()
 
     def cloning_finished(self):
         assert not self.has_cloning_finished
@@ -637,7 +655,6 @@ class Build(YamlModel):
         assert not self.has_build_started
         record_time(self.path.build_begin)
         self.result = self.BUILDING
-        self.save()
 
     def build_finished(self):
         assert not self.has_build_finished
@@ -680,6 +697,7 @@ class BaseJob(YamlModel):
     SUCCEEDED = 'success'
     FAILED = 'failure'
     GITHUB_STATES = {}
+    SLACK_MESSAGES = {}
 
     parent_class = Build
 
@@ -707,16 +725,28 @@ class BaseJob(YamlModel):
 
     @result.setter
     def result(self, result):
-        if result in self.GITHUB_STATES:
-            sha = self.build.commit_info['hash']
-            repo = self.repo.get_github()
-            description = self.GITHUB_STATES[result].format(o=self)
-            repo.create_status(
-                sha, result, target_url=self.url,
-                description=description,
-                context='shipmaster/{}'.format(self.path.job_type),
-            )
         self.dict['result'] = result
+        self.save()
+
+        try:
+            if result in self.GITHUB_STATES:
+                sha = self.build.commit_info['hash']
+                repo = self.repo.get_github()
+                description = self.GITHUB_STATES[result].format(o=self)
+                repo.create_status(
+                    sha, result, target_url=self.url,
+                    description=description,
+                    context='shipmaster/{}'.format(self.path.job_type),
+                )
+        except:
+            pass
+
+        try:
+            if result in self.SLACK_MESSAGES:
+                message = self.SLACK_MESSAGES[result].format(o=self)
+                self.build.slack(message)
+        except:
+            pass
 
     @property
     def is_successful(self):
@@ -724,7 +754,6 @@ class BaseJob(YamlModel):
 
     def succeeded(self):
         self.result = self.SUCCEEDED
-        self.save()
 
     @property
     def has_failed(self):
@@ -732,7 +761,6 @@ class BaseJob(YamlModel):
 
     def failed(self):
         self.result = self.FAILED
-        self.save()
 
     @property
     def has_started(self):
@@ -746,7 +774,6 @@ class BaseJob(YamlModel):
         assert not self.has_started
         record_time(self.path.begin)
         self.result = self.RUNNING
-        self.save()
 
     def finished(self):
         assert not self.has_finished
@@ -795,6 +822,7 @@ class Test(BaseJob):
         BaseJob.SUCCEEDED: "tests passed",
         BaseJob.FAILED: "tests failed"
     }
+    SLACK_MESSAGES = GITHUB_STATES
 
     def __init__(self, build, number, **kwargs):
         super().__init__(build, number, **kwargs)
@@ -862,7 +890,6 @@ class Test(BaseJob):
 
     def test(self):
         self.result = self.QUEUED
-        self.save()
         from .tasks import test_app
         test_app.delay(self.path.absolute)
         return self
@@ -887,6 +914,7 @@ class Deployment(BaseJob):
         BaseJob.SUCCEEDED: "'{o.destination}' deployment done",
         BaseJob.FAILED: "'{o.destination}' deployment failed"
     }
+    SLACK_MESSAGES = GITHUB_STATES
 
     def __init__(self, build, number, **kwargs):
         super().__init__(build, number, **kwargs)
@@ -917,7 +945,6 @@ class Deployment(BaseJob):
 
     def deploy(self):
         self.result = self.QUEUED
-        self.save()
         from .tasks import deploy_app
         deploy_app.delay(self.path.absolute)
         return self

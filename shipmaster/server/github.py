@@ -95,7 +95,10 @@ class GitHubEvent(WebHookView):
     def push(payload, request):
         repo_name = payload['repository']['name']
         branch_name = payload['ref'].split('/')[-1]
-        repo = Repository.load(request.shipmaster, repo_name)
-        Build.create(repo, branch_name, pull_request=True).build()
+        # TODO: Need to fetch just .shipmaster.yml from the push
+        #       and figure out if this branch should be built or not
+        if branch_name in ['master', 'develop', 'dev']:
+            repo = Repository.load(request.shipmaster, repo_name)
+            Build.create(repo, branch_name, pull_request=True).build()
         return {'status': 'received'}
 

@@ -24,6 +24,8 @@ class ProjectConf:
         self.test = LayerConf(self, 'test', layers.get('test', {}))
 
         self.ssh = SSHConf(self, conf_dict.get('ssh', {}))
+        self.slack = SlackConf(self, conf_dict.get('slack', {}))
+        self.build = BuildConf(self, conf_dict.get('build', {}))
 
 
 class LayerConf:
@@ -51,3 +53,19 @@ class SSHConf:
     def __init__(self, conf, ssh):
         self.conf = conf
         self.known_hosts = ssh.get('known_hosts', [])
+
+
+class SlackConf:
+    def __init__(self, conf, slack):
+        self.conf = conf
+        self.api = slack.get('api')
+
+    @property
+    def is_enabled(self):
+        return self.api is not None
+
+
+class BuildConf:
+    def __init__(self, conf, build):
+        self.conf = conf
+        self.branches = build.get('branches', ['master'])
