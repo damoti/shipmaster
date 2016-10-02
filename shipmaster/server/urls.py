@@ -6,9 +6,9 @@ from . import views, github
 urlpatterns = [
 
     # GitHub
-    url(r"^login$", github.GitHubLogin.as_view(), name='login'),
-    url(r"^authorized$", github.GitHubAuthorized.as_view()),
-    url(r"^event$", csrf_exempt(github.GitHubEvent.as_view())),
+    url(r"^login$", github.GitHubLoginView.as_view(), name='login'),
+    url(r"^authorized$", github.GitHubAuthorizedView.as_view()),
+    url(r"^event$", csrf_exempt(github.GitHubEventView.as_view())),
 
     # General
     url(r"^$", login_required(views.Dashboard.as_view()), name="dashboard"),

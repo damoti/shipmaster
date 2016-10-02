@@ -62,16 +62,36 @@ def build_app(path):
 
     build.cloning_started()
     try:
+
         result = run(
             ["git", "clone",
-             "--depth=1",
-             "--branch={}".format(build.branch),
+             "--depth=50",
+             "--branch={}".format(build.branch) if not build.pull_request else "",
              build.repo.project_git,
              build.path.workspace],
             env=git_ssh_command
         )
         if result != 0:
             return build.failed()
+
+        if build.pull_request:
+            result = run(
+                ["git", "fetch", "origin",
+                 "+refs/pull/{}/merge:".format(build.pull_request)],
+                env=git_ssh_command, cwd=build.path.workspace
+            )
+            if result != 0:
+                return build.failed()
+
+        if build.pull_request or build.sha:
+            result = run(
+                ["git", "checkout", "-qf",
+                 "FETCH_HEAD" if build.pull_request else build.sha],
+                env=git_ssh_command, cwd=build.path.workspace
+            )
+            if result != 0:
+                return build.failed()
+
     except:
         logger.exception("Git clone process threw an exception:")
         return build.failed()
@@ -96,7 +116,7 @@ def build_app(path):
 
     build.succeeded()
 
-    if build.pull_request:
+    if build.automated:
         Test.create(build).test()
 
 
@@ -122,7 +142,7 @@ def test_app(path):
 
     test.succeeded()
 
-    if test.build.pull_request:
+    if test.build.automated:
         Deployment.create(test.build, 'sandbox').deploy()
 
 

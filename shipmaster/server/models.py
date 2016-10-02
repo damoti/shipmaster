@@ -481,8 +481,8 @@ class Build(YamlModel):
         self.path = BuildPath(repo, number)
 
     @classmethod
-    def create(cls, repo, branch, **kwargs):
-        build = cls(repo, repo.increment_build_number(), branch=branch, **kwargs)
+    def create(cls, repo, branch, sha=None, pull_request=None, automated=False, **kwargs):
+        build = cls(repo, repo.increment_build_number(), branch=branch, sha=sha, pull_request=pull_request, automated=automated, **kwargs)
         os.mkdir(build.path.absolute)
         os.mkdir(build.path.tests)
         os.mkdir(build.path.deployments)
@@ -536,13 +536,41 @@ class Build(YamlModel):
 
     @property
     def branch(self):
-        """ Required immutable field, set when the build is created. """
+        """
+        Required immutable field, set when the build is created.
+        For "push" triggers this is the branch to which code was pushed.
+        For "pull request" triggers this is the 'base' branch where code would be merged.
+        For manually started builds this is user defined.
+        """
         return self.dict['branch']
 
     @property
+    def sha(self):
+        """
+        Optional immutable field, set when the build is created.
+        For "push" triggers this is the most recent commit in the push.
+        For "pull request" triggers this is the 'base' branch commit against which merge is attempted.
+        For manually started builds this is the HEAD of branch.
+        """
+        return self.dict.get('sha')
+
+    @property
     def pull_request(self):
-        """ Optional immutable field, set when the build is created. """
-        return self.dict.get('pull_request', False)
+        """
+        Optional immutable field, set when the build is created.
+        When this build is triggered by a pull request this will
+        have the pull request number.
+        """
+        return self.dict.get('pull_request')
+
+    @property
+    def automated(self):
+        """
+        Optional immutable field, set when the build is created.
+        Used to determine if the automated workflow is used or if this
+        was a one-off manually triggered build.
+        """
+        return self.dict.get('automated', False)
 
     def get_conf(self):
         return ProjectConf.from_workspace(self.path.workspace)

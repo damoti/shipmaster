@@ -12,6 +12,10 @@ class ProjectConf:
         with open(filename, 'r') as file:
             return cls(filename, yaml.load(file))
 
+    @classmethod
+    def from_string(cls, src):
+        return cls('', yaml.load(src))
+
     def __init__(self, path, conf_dict):
         self.path = path
         self.name = conf_dict['name']
