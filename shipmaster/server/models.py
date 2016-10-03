@@ -533,7 +533,7 @@ class Build(YamlModel):
 
         try:
             if result in self.SLACK_MESSAGES:
-                self.slack(self.SLACK_MESSAGES[result])
+                self.slack('build.{}'.format(result), self.SLACK_MESSAGES[result])
         except:
             pass
 
@@ -591,10 +591,12 @@ class Build(YamlModel):
         build_app.delay(self.path.absolute)
         return self
 
-    def slack(self, message):
+    def slack(self, event, message):
         conf = self.get_conf()
         if message and conf.slack.is_enabled:
-            requests.post(conf.slack.api, json.dumps({'text': message}))
+            # if no filters then send for all events, otherwise only for allowed events
+            if not conf.slack.events or event in conf.slack.events:
+                requests.post(conf.slack.api, json.dumps({'text': message}))
 
     @property
     def tests(self):
@@ -790,7 +792,7 @@ class BaseJob(YamlModel):
         try:
             if result in self.SLACK_MESSAGES:
                 message = self.SLACK_MESSAGES[result].format(o=self)
-                self.build.slack(message)
+                self.build.slack('{}.{}'.format(self.path.job_type, result), message)
         except:
             pass
 
