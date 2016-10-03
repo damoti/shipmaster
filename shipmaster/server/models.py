@@ -518,7 +518,10 @@ class Build(YamlModel):
 
         try:
             if result in self.GITHUB_STATES:
-                sha = self.commit_info['hash']
+                if self.pull_request:
+                    sha = self.pull_request_parent_sha
+                else:
+                    sha = self.commit_info['hash']
                 repo = self.repo.get_github()
                 repo.create_status(
                     sha, result, target_url=self.url,
@@ -639,6 +642,18 @@ class Build(YamlModel):
         info['branch'] = self.branch
         return info
 
+    @property
+    def pull_request_parent_sha(self):
+        assert self.pull_request
+        details_cmnd = ['git', 'log', '--format=%P', '-n', '1']
+        result = subprocess.run(details_cmnd, cwd=self.path.workspace, stdout=subprocess.PIPE)
+        # this returns two hashes, one for each parent of our pull request
+        hashes = result.stdout.decode().strip().split(' ')
+        for hash in hashes:
+            # self.sha is the base HEAD, we want the other one, the pull request HEAD
+            if hash != self.sha:
+                return hash
+
     # Repository Cloning
 
     @property
@@ -758,7 +773,10 @@ class BaseJob(YamlModel):
 
         try:
             if result in self.GITHUB_STATES:
-                sha = self.build.commit_info['hash']
+                if self.build.pull_request:
+                    sha = self.build.pull_request_parent_sha
+                else:
+                    sha = self.build.commit_info['hash']
                 repo = self.repo.get_github()
                 description = self.GITHUB_STATES[result].format(o=self)
                 repo.create_status(
@@ -937,12 +955,11 @@ class DeploymentPath(BaseJobPath):
 
 class Deployment(BaseJob):
 
-    GITHUB_STATES = {
+    SLACK_MESSAGES = {
         BaseJob.RUNNING: "'{o.destination}' deploying...",
         BaseJob.SUCCEEDED: "'{o.destination}' deployment done",
         BaseJob.FAILED: "'{o.destination}' deployment failed"
     }
-    SLACK_MESSAGES = GITHUB_STATES
 
     def __init__(self, build, number, **kwargs):
         super().__init__(build, number, **kwargs)

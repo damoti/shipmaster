@@ -63,33 +63,27 @@ def build_app(path):
     build.cloning_started()
     try:
 
-        result = run(
-            ["git", "clone",
-             "--depth=50",
-             "--branch={}".format(build.branch) if not build.pull_request else "",
-             build.repo.project_git,
-             build.path.workspace],
-            env=git_ssh_command
-        )
-        if result != 0:
+        cmd = ["git", "clone", "--depth=50"]
+        if not build.pull_request:
+            cmd += "--branch={}".format(build.branch),
+        cmd += build.repo.project_git,
+        cmd += build.path.workspace,
+        if run(cmd, env=git_ssh_command) != 0:
             return build.failed()
 
         if build.pull_request:
-            result = run(
-                ["git", "fetch", "origin",
-                 "+refs/pull/{}/merge:".format(build.pull_request)],
-                env=git_ssh_command, cwd=build.path.workspace
-            )
-            if result != 0:
+            if run(["git", "fetch", "origin",
+                    "+refs/pull/{}/merge:".format(build.pull_request)],
+                    env=git_ssh_command, cwd=build.path.workspace) != 0:
                 return build.failed()
 
         if build.pull_request or build.sha:
-            result = run(
-                ["git", "checkout", "-qf",
-                 "FETCH_HEAD" if build.pull_request else build.sha],
-                env=git_ssh_command, cwd=build.path.workspace
-            )
-            if result != 0:
+            cmd = ["git", "checkout", "-qf"]
+            if build.pull_request:
+                cmd += "FETCH_HEAD",
+            else:
+                cmd += build.sha,
+            if run(cmd, env=git_ssh_command, cwd=build.path.workspace) != 0:
                 return build.failed()
 
     except:
@@ -102,11 +96,9 @@ def build_app(path):
     try:
         project = build.get_project()
         if not project.base.exists():
-            result = project.base.build()
-            if result != 0:
+            if project.base.build() != 0:
                 return build.failed()
-        result = project.app.build()
-        if result != 0:
+        if project.app.build() != 0:
             return build.failed()
     except:
         logger.exception("Build process threw an exception:")
@@ -128,11 +120,9 @@ def test_app(path):
     compose = test.get_compose(project)
     test.started()
     try:
-        result = project.test.build()
-        if result != 0:
+        if project.test.build() != 0:
             return test.failed()
-        result = project.test.run(compose, test.path.reports)
-        if result != 0:
+        if project.test.run(compose, test.path.reports) != 0:
             return test.failed()
     except:
         logger.exception("Test process threw an exception:")
@@ -153,11 +143,9 @@ def deploy_app(path):
     project = deployment.get_project()
     deployment.started()
     try:
-        result = project.app.deploy(
-            deployment.shipmaster.infrastructure.compose,
-            deployment.destination
-        )
-        if result != 0:
+        if project.app.deploy(
+                deployment.shipmaster.infrastructure.compose,
+                deployment.destination) != 0:
             return deployment.failed()
     except:
         logger.exception("Deployment process threw an exception:")
