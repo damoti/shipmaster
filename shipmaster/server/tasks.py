@@ -160,20 +160,15 @@ def deploy_app(path):
 def sync_infrastructure(path):
     infra = Infrastructure.from_path(path)
     if infra.is_checkout_running: return
-    _replace_handler(FileHandler(infra.path.git_log, 'w'))
+    _replace_handler(FileHandler(infra.path.log, 'w'))
     git_ssh_command = {"GIT_SSH_COMMAND": "ssh -F {}".format(infra.shipmaster.path.ssh_config)}
     infra.checkout_started()
     try:
         if os.path.exists(infra.path.src):
-            result = run(["git", "pull"], cwd=infra.path.src, env=git_ssh_command)
+            run(["git", "pull"], cwd=infra.path.src, env=git_ssh_command)
         else:
-            result = run(["git", "clone", infra.project_git, infra.path.src], env=git_ssh_command)
-        if result != 0:
-            return infra.failed()
+            run(["git", "clone", infra.project_git, infra.path.src], env=git_ssh_command)
     except:
         logger.exception("Failed to update infrastructure sources:")
-        return infra.failed()
     finally:
         infra.checkout_finished()
-
-    infra.succeeded()

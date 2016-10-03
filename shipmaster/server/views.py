@@ -70,25 +70,14 @@ class CreateRepository(FormView):
 
 class StartBuild(View):
 
-    def pull(self, repo):
+    def get(self, request, *args, **kwargs):
+        repo = request.current_repo
         if repo.is_infrastructure:
             repo.sync()
             return HttpResponseRedirect(reverse('repository', args=[repo.name]))
         else:
             build = Build.create(repo, 'dev').build()
             return HttpResponseRedirect(reverse('build', args=[repo.name, build.number]))
-
-    def post(self, request, *args, **kwargs):
-        repo = request.current_repo
-        try:
-            self.pull(repo)
-        except:
-            return HttpResponse('FAILED')
-        else:
-            return HttpResponse('OK')
-
-    def get(self, request, *args, **kwargs):
-        return self.pull(request.current_repo)
 
 
 class BuildView(TemplateView):

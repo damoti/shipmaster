@@ -287,7 +287,7 @@ class InfrastructurePath(RepositoryPath):
         return os.path.join(self.absolute, 'checkout.running')
 
     @property
-    def git_log(self):
+    def log(self):
         return os.path.join(self.absolute, 'git.log')
 
 
@@ -329,7 +329,7 @@ class Infrastructure(Repository):
 
     @property
     def has_log(self):
-        return os.path.exists(self.path.git_log)
+        return os.path.exists(self.path.log)
 
     @property
     def is_log_finished(self):
@@ -338,9 +338,9 @@ class Infrastructure(Repository):
         return False
 
     @property
-    def formatted_checkout_log(self):
+    def log(self):
         assert self.is_log_finished
-        with open(self.path.git_log, 'r') as log_file:
+        with open(self.path.log, 'r') as log_file:
             return log_file.read()
 
     # Compose
