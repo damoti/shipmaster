@@ -345,9 +345,6 @@ class Infrastructure(Repository):
 
     # Compose
 
-    def formatted_compose_config(self):
-        return ''
-
     def get_deploy_destinations(self):
         if not self.compose:
             return []

@@ -144,6 +144,10 @@ class TestReports(TemplateResponseMixin, View):
                 file = test.get_report_file(report, 'rb')
                 return FileResponse(file, content_type='text/css')
 
+            elif report.endswith('.js'):
+                file = test.get_report_file(report, 'rb')
+                return FileResponse(file, content_type='text/javascript')
+
             else:
                 file = test.get_report_file(report, 'rb')
                 return FileResponse(file)
