@@ -1,5 +1,5 @@
 import os
-import sys
+
 
 SHIPMASTER_DATA = "/var/lib/shipmaster"
 BASE_URL = os.environ.get('BASE_URL', 'http://localhost:8000')
@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_dartium',
-    'bootstrapform',
+    'bootstrap',
     'channels',
     'shipmaster.server'
 ]
