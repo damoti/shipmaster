@@ -1,4 +1,4 @@
-name: systori
+name: shipmaster
 
 layers:
   base:
@@ -11,6 +11,7 @@ layers:
     context:
       - .
     build:
+      - pip3 install -r requirements/app.pip
       - cd shipmaster/dart && pub get && pub build
       - cd /app
       - export DJANGO_SETTINGS_MODULE=shipmaster.server.settings
