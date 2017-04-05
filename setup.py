@@ -1,27 +1,45 @@
-from setuptools import setup
+#!/usr/bin/env python
+import os
+from setuptools import setup, find_packages
 
-setup(name='shipmaster',
-      version='0.1',
-      description='Continuous integration and deployment.',
-      classifiers=[
-        'Development Status :: 3 - Alpha',
+
+BASE = os.path.dirname(__file__)
+README_PATH = os.path.join(BASE, 'README.rst')
+CHANGES_PATH = os.path.join(BASE, 'CHANGES.rst')
+long_description = '\n\n'.join((
+    open(README_PATH).read(),
+    open(CHANGES_PATH).read(),
+))
+
+
+setup(
+    name='shipmaster',
+    version='0.1',
+    url='https://github.com/damoti/shipmaster',
+    license='BSD',
+    description='Continuous integration and deployment.',
+    long_description=long_description,
+    author='Lex Berezhny',
+    author_email='lex@damoti.com',
+    keywords='ci deployment testing',
+    classifiers=[
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: BSD License',
         'Programming Language :: Python :: 3',
-      ],
-      keywords='ci deployment testing',
-      url='http://github.com/damoti/shipmaster',
-      author='Lex Berezhny',
-      author_email='lex@damoti.com',
-      license='BSD',
-      packages=['shipmaster'],
-      install_requires=[
-          'humanfriendly',
-          'docker-map',
-          'docker-compose',
-          'ruamel.yaml'
-      ],
-      entry_points={
-          'console_scripts': ['shipmaster=shipmaster.cli:main'],
-      },
-      include_package_data=True,
-      zip_safe=False
+        'Topic :: Software Development :: Testing',
+    ],
+    install_requires=[
+        'humanfriendly',
+        'docker-map',
+        'docker-compose',
+        'ruamel.yaml'
+    ],
+    packages=[
+        'shipmaster'
+    ],
+    include_package_data=True,
+    zip_safe=False,
+    entry_points={
+        'console_scripts': ['shipmaster=shipmaster.cli:main'],
+    },
 )
