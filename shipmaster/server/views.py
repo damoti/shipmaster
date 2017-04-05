@@ -6,7 +6,7 @@ from django.views.generic.base import TemplateResponseMixin
 from django.core.urlresolvers import reverse
 from django.core.exceptions import ViewDoesNotExist
 
-from docker import Client
+from docker import DockerClient
 
 from .models import Repository, Build, Test, Deployment
 from .forms import RepositoryForm
@@ -17,7 +17,7 @@ class Dashboard(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data()
-        client = Client('unix://var/run/docker.sock')
+        client = DockerClient('unix://var/run/docker.sock')
         context['containers'] = client.containers()
         return context
 

@@ -2,7 +2,7 @@ import os
 import time
 import struct
 import logging
-from docker import Client
+from docker import DockerClient
 from docker import constants as docker_constants
 from compose.service import Service, VolumeSpec
 from compose.service import Container
@@ -21,7 +21,7 @@ class Project:
         self.build_num = build_num
         self.commit_info = commit_info
         self.job_num = job_num
-        self.client = Client('unix://var/run/docker.sock')
+        self.client = DockerClient('unix://var/run/docker.sock')
 
         self.debug_ssh = debug_ssh
         self.ssh_agent = False

@@ -31,7 +31,7 @@ setup(
     install_requires=[
         'humanfriendly',
         'docker-map',
-        'docker-compose',
+        'docker-compose==1.12.0rc2',
         'ruamel.yaml'
     ],
     packages=[
