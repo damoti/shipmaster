@@ -2,7 +2,7 @@ django
 channels
 asgi_ipc
 django-dartium
-django-bootstrap-form
+django-bootstrap-components
 django-github-webhook
 requests_oauthlib
 celery
