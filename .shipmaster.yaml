@@ -4,9 +4,9 @@ layers:
   base:
     from: damoti/base:latest
     context:
-      - requirements.pip
+      - requirements/base.pip
     build:
-      - pip3 install -r requirements.pip
+      - pip3 install -r requirements/base.pip
   app:
     context:
       - .

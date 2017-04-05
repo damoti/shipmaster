@@ -9,14 +9,15 @@ RUN mkdir -p /root/.ssh && \
     ssh-keyscan bitbucket.org >> /root/.ssh/known_hosts
 
 COPY shipmaster /usr/lib/shipmaster/shipmaster
-COPY manage.py setup.py requirements.pip /usr/lib/shipmaster/
+COPY requirements /usr/lib/shipmaster
+COPY manage.py setup.py /usr/lib/shipmaster
 
 WORKDIR /usr/lib/shipmaster/shipmaster/dart
 RUN pub get
 RUN pub build
 
 WORKDIR /usr/lib/shipmaster
-RUN pip3 install -r requirements.pip
+RUN pip3 install -r requirements/app.pip
 RUN python3 manage.py migrate --noinput
 RUN python3 manage.py collectstatic --noinput
 
