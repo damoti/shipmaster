@@ -14,7 +14,7 @@ long_description = '\n\n'.join((
 
 setup(
     name='shipmaster',
-    version='0.1',
+    version='0.1.0',
     url='https://github.com/damoti/shipmaster',
     license='BSD',
     description='Continuous integration and deployment.',
@@ -30,8 +30,7 @@ setup(
     ],
     install_requires=[
         'humanfriendly',
-        'docker-map',
-        'docker-compose==1.12.0rc2',
+        'docker-compose',
         'ruamel.yaml'
     ],
     packages=[
