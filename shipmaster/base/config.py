@@ -1,8 +1,9 @@
 import os
+from collections import OrderedDict, namedtuple
 from ruamel import yaml
 
 
-class ProjectConf:
+class ProjectConfig(namedtuple('_ProjectConfig', 'version name branches stages images plugins')):
 
     @classmethod
     def from_workspace(cls, path):
@@ -10,68 +11,72 @@ class ProjectConf:
         if not os.path.exists(filename):
             return None
         with open(filename, 'r') as file:
-            return cls(filename, yaml.load(file))
+            return cls.from_kwargs(**yaml.load(file, yaml.RoundTripLoader))
 
     @classmethod
     def from_string(cls, src):
-        return cls('', yaml.load(src))
+        return cls.from_kwargs(**yaml.safe_load(src, yaml.RoundTripLoader))
 
-    def __init__(self, path, conf_dict):
-        self.path = path
-        self.name = conf_dict['name']
-        self.workspace = os.path.dirname(path)
-        self.conf_dict = conf_dict
+    @classmethod
+    def from_kwargs(cls, **kwargs):
+        version = kwargs.pop('version', 1)
+        name = kwargs.pop('name')
+        branches = kwargs.pop('branches', ['master']),
+        stages = kwargs.pop('stages', ['build'])
+        images = OrderedDict()
+        plugins = OrderedDict()
+        project = cls(version, name, branches, stages, images, plugins)
+        for name, image in kwargs.pop('images', {}).items():
+            images[name] = Image.from_kwargs(name=name, project=project, **image)
+        # all keys still left in the configuration are plugins
+        for name, plugin in kwargs.items():
+            plugins[name] = Plugin(name, project, plugin)
+        return project
 
-        layers = conf_dict.get('layers', {})
-        self.base = LayerConf(self, 'base', layers.get('base', {}))
-        self.app = LayerConf(self, 'app', layers.get('app', {}))
-        self.test = LayerConf(self, 'test', layers.get('test', {}))
+    def check(self):
+        for image in self.images.values():
+            if image.stage and image.stage not in self.stages:
+                raise ValueError(
+                    "Stage '{}' for image '{}' is not one of the available stages: {}"
+                    .format(image.stage, image.name, ', '.join(self.stages))
+                )
 
-        self.ssh = SSHConf(self, conf_dict.get('ssh', {}))
-        self.slack = SlackConf(self, conf_dict.get('slack', {}))
-        self.build = BuildConf(self, conf_dict.get('build', {}))
-
-
-class LayerConf:
-    def __init__(self, project, name, layer):
-        self.name = name
-        self.repository = '{}/{}'.format(project.name, name)
-        self.from_image = layer.get('from')
-        if name == 'base' and not self.from_image:
-            raise AttributeError("'base' layer must have 'from' attribute")
-        self.build = layer.get('build', [])
-        if type(self.build) is str:
-            self.build = [self.build]
-        self.prepare = layer.get('prepare', [])
-        if type(self.prepare) is str:
-            self.prepare = [self.prepare]
-        self.start = layer.get('start')
-        self.wait_for = layer.get('wait-for')
-        self.apt_get = layer.get('apt-get', [])
-        self.context = layer.get('context', [])
-        self.volumes = layer.get('volumes', [])
-        self.environment = layer.get('environment', {})
+    def dump(self):
+        for image in self.images:
+            print(image)
 
 
-class SSHConf:
-    def __init__(self, conf, ssh):
-        self.conf = conf
-        self.known_hosts = ssh.get('known_hosts', [])
+class Image(namedtuple('_Image', 'name project stage from_image build prepare start plugins')):
 
+    @classmethod
+    def from_kwargs(cls, name, project, **kwargs):
+        stage = kwargs.pop('stage', name)
+        from_image = kwargs.pop('from')
 
-class SlackConf:
-    def __init__(self, conf, slack):
-        self.conf = conf
-        self.api = slack.get('api')
-        self.events = slack.get('events', [])
+        build = kwargs.pop('build', [])
+        if type(build) is str:
+            build = [build]
+
+        prepare = kwargs.pop('prepare', [])
+        if type(prepare) is str:
+            prepare = [prepare]
+
+        start = kwargs.pop('start', [])
+        if type(start) is str:
+            start = [start]
+
+        # all key/values still left in the configuration are plugins
+        plugins = {
+            name: Plugin(name, project, plugin)
+            for name, plugin in kwargs.items()
+        }
+
+        return cls(name, project, stage, from_image, build, prepare, start, plugins)
 
     @property
-    def is_enabled(self):
-        return self.api is not None
+    def repository(self):
+        return '{}/{}'.format(self.project.name, self.name)
 
 
-class BuildConf:
-    def __init__(self, conf, build):
-        self.conf = conf
-        self.branches = build.get('branches', ['master'])
-        self.pull_requests = build.get('pull_requests', True)
+class Plugin(namedtuple('_Plugin', 'name project config')):
+    pass

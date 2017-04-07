@@ -8,7 +8,7 @@ from compose.service import Service, VolumeSpec
 from compose.service import Container
 from compose.project import Project as ComposeProject
 from requests.packages.urllib3.exceptions import ReadTimeoutError
-from .config import ProjectConf, LayerConf
+from .config import ProjectConfig
 from .script import Archive, Script, SCRIPT_PATH, APP_PATH
 
 logger = logging.getLogger('shipmaster.builder')
@@ -16,8 +16,8 @@ logger = logging.getLogger('shipmaster.builder')
 
 class Project:
 
-    def __init__(self, conf: ProjectConf, build_num='0', job_num='0', commit_info=None, ssh_config=None, debug_ssh=False, editable=False):
-        self.conf = conf
+    def __init__(self, config: ProjectConfig, build_num='0', job_num='0', commit_info=None, ssh_config=None, debug_ssh=False, editable=False):
+        self.config = config
         self.build_num = build_num
         self.commit_info = commit_info
         self.job_num = job_num
@@ -59,9 +59,9 @@ class Project:
                 "{}:{}".format(self.local_ssh_auth_dir, self.image_ssh_auth_dir)
             ]
 
-        self.base = BaseLayer(self, self.conf.base)
-        self.app = AppLayer(self, self.conf.app, editable)
-        self.test = TestLayer(self, self.conf.test)
+        #self.base = BaseLayer(self, self.conf.base)
+        #self.app = AppLayer(self, self.conf.app, editable)
+        #self.test = TestLayer(self, self.conf.test)
 
     @property
     def test_tag(self):
@@ -74,7 +74,7 @@ class Project:
 
 class LayerBase:
 
-    def __init__(self, project: Project, layer: LayerConf):
+    def __init__(self, project: Project, layer):
         self.project = project
         self.layer = layer
         self.archive = Archive(project.conf.workspace)
@@ -164,7 +164,7 @@ class BaseLayer(LayerBase):
 
 class AppLayer(LayerBase):
 
-    def __init__(self, project: Project, layer: LayerConf, editable=False):
+    def __init__(self, project: Project, layer, editable=False):
         super().__init__(project, layer)
         self.editable = editable
         if self.editable:
