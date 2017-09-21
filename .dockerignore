@@ -1,7 +1,0 @@
-.git
-build
-dist
-db.sqlite3
-**/__pycache__
-shipmaster.egg-info
-.idea

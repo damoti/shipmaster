@@ -1,8 +1,0 @@
-django
-channels
-asgi_ipc
-django-github-webhook
-requests_oauthlib
-celery
-coverage
-github3.py==1.0.0a4

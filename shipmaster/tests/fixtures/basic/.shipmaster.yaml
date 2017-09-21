@@ -1,0 +1,8 @@
+name: hello-world
+images:
+  printer:
+    stage: build
+    from: 'busybox:latest'
+    build: 'make.sh'
+    run: 'test.sh'
+    start: 'deploy.sh'

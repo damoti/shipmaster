@@ -1,11 +1,11 @@
-import os
-import sys
 import argparse
 import logging
-from ..base.builder import Project
-from ..base.config import ProjectConfig
-from .graph import print_graph
+import os
+import sys
 
+from shipmaster.core.plugins import Platform, PluginManager
+from shipmaster.core.builder import Builder
+from shipmaster.core.config import BuildConfig
 
 logger = logging.getLogger('shipmaster')
 
@@ -26,17 +26,16 @@ def parse_arguments(project):
     run.add_argument("--run-all", help="Build parent layers if they don't exist.", action="store_true")
     run.add_argument("--rerun", help="Rerun this layer.", action="store_true")
     run.add_argument("--rerun-all", help="Rerun this layer and all parent layers.", action="store_true")
-    run.add_argument("--debug-ssh-agent", help="Show some output related to ssh-agent forwarding.", action="store_true")
     run.set_defaults(command=run_command)
-
-    test = subparsers.add_parser('test', help="Runs the test layer.")
-    test.set_defaults(command=test_command)
 
     config = subparsers.add_parser('config', help="Show the config.")
     config.set_defaults(command=lambda args, project: project.config.dump())
 
-    graph = subparsers.add_parser('graph', help="Show the graph.")
-    graph.set_defaults(command=print_graph)
+    for plugin in PluginManager.plugin_classes:
+        plugin.contribute_to_argparse(subparsers, {
+            'run': run,
+            'config': config,
+        })
 
     return parser.parse_args()
 
@@ -91,14 +90,10 @@ def test_command(args, project):
 
 
 def main():
-    config = ProjectConfig.from_workspace(os.getcwd())
+    PluginManager.load(Platform.cli)
+    config = BuildConfig.from_workspace(os.getcwd())
     args = parse_arguments(config)
     logging.basicConfig(level=logging.INFO)  # TODO: set from args
-    project = Project(
-        config,
-        commit_info={},
-        debug_ssh=getattr(args, 'debug_ssh_agent', False),
-        editable=getattr(args, 'editable', False)
-    )
+    builder = Builder(config, args, commit_info={})
     if hasattr(args, 'command'):
-        args.command(args, project)
+        args.command(args, builder)

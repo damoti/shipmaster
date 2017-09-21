@@ -14,7 +14,7 @@ long_description = '\n\n'.join((
 
 setup(
     name='shipmaster',
-    version='0.1.0',
+    version='0.0.1',
     url='https://github.com/damoti/shipmaster',
     license='BSD',
     description='Continuous integration and deployment.',

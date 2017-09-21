@@ -1,0 +1,4 @@
+version: '2'
+services:
+  hello_world:
+    image: hello-world/printer
