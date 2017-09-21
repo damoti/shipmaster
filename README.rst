@@ -1,9 +1,17 @@
-|pypi| |travis| |coverage|
+shipmaster |pypi| |travis| |coverage|
+=====================================
 
-shipmaster
-==========
+Docker based continuous integration, testing and deployment with the following priorities:
 
-Continuous integration and deployment.
+**Build Efficiency**
+  Re-use containers from different phases of your build.
+
+**Convention Over Configuration**
+  Just works, with minimal configuration.
+
+**Best Practices**
+  Opinionated and encourages best practices.
+
 
 
 .. |pypi| image:: https://img.shields.io/pypi/v/shipmaster.svg
