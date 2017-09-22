@@ -62,7 +62,7 @@ class ImageBuildTests(DockerClientTestCase):
 
 class ImageBuildRunStartTests(DockerClientTestCase):
 
-    def test_simple_workflow(self):
+    def x_test_simple_workflow(self):
         build_config = BuildConfig.from_kwargs(
             '', name='test-project', stages=['build'], images={
                 'app': {
