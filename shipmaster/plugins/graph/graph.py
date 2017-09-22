@@ -13,13 +13,13 @@ class GraphPlugin(Plugin):
         graph.set_defaults(command=print_graph)
 
 
-def print_graph(args, builder):
+def print_graph(args, config):
     columns = []
     max_rows = 0
-    for stage in builder.config.stages:
+    for stage in config.stages:
         rows = []
         max_width = len(stage)
-        for image in builder.config.images.values():
+        for image in config.image_configs.values():
             if image.stage == stage:
                 rows.append(image.name)
                 max_width = max(max_width, len(image.name))
