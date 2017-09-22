@@ -12,6 +12,7 @@ install: pip install tox-travis coverage
 script: tox
 
 after_success:
+  - coverage combine tests/
   - bash <(curl -s https://codecov.io/bash)
 
 notifications:

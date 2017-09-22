@@ -34,9 +34,8 @@ setup(
         'ruamel.yaml'
     ],
     packages=[
-        'shipmaster.core',
-        'shipmaster.cli',
-        'shipmaster.plugins'
+        'shipmaster.'+p for p in
+        find_packages('shipmaster')
     ],
     entry_points={
         'console_scripts': ['shipmaster=shipmaster.cli:main'],
