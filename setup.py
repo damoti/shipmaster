@@ -21,7 +21,7 @@ setup(
     long_description=long_description,
     author='Lex Berezhny',
     author_email='lex@damoti.com',
-    keywords='ci deployment testing',
+    keywords='docker ci continuous integration build test deploy',
     classifiers=[
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',
@@ -34,10 +34,10 @@ setup(
         'ruamel.yaml'
     ],
     packages=[
-        'shipmaster'
+        'shipmaster.core',
+        'shipmaster.cli',
+        'shipmaster.plugins'
     ],
-    include_package_data=True,
-    zip_safe=False,
     entry_points={
         'console_scripts': ['shipmaster=shipmaster.cli:main'],
     },
