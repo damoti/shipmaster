@@ -1,0 +1,33 @@
+{% extends "shipmaster/base.html" %}
+{% load i18n static dartium %}
+
+{% block content %}
+
+  <div class="mdl-cell mdl-cell--12-col">
+
+    <div class="mdl-card mdl-shadow--2dp">
+      <div class="mdl-card__supporting-text">
+        <h4>Test #{{ current_job.number }}</h4>
+        {% if current_job.has_finished %}
+        <a href="{% url "test.reports" current_repo.name current_build.number current_job.number 'index.html' %}">Test Report</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="mdl-card mdl-shadow--2dp" id="log-output"
+         data-path="{{ current_job.path.log }}"
+        {% if current_job.has_finished %}
+         data-finished="{{ current_job.elapsed_time }}"
+        {% endif %}>
+      {% if current_job.has_finished %}
+        {{ current_job.log|linebreaksbr }}
+      {% endif %}
+    </div>
+
+  </div>
+
+{% endblock %}
+
+{% block script %}
+  {% dart "client.dart" %}
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "shipmaster/base.html" %}
+{% load i18n %}
+
+{% block content %}
+
+  <div class="mdl-cell mdl-cell--6-col">
+
+    <div class="mdl-card mdl-shadow--2dp">
+      <div class="mdl-card__supporting-text">
+        <h4>Pull & Build</h4>
+        <p>Pull the latest source from {{ current_repo.git }} and kick off a build.</p>
+      </div>
+      <div class="mdl-card__actions">
+        <a href="{% url "build.start" current_repo.name %}" class="mdl-button">{% trans "Start Build" %}</a>
+      </div>
+    </div>
+
+    <div class="mdl-card mdl-shadow--2dp">
+      <div class="mdl-card__supporting-text">
+        <h4>Builds</h4>
+        <p>Previous builds:</p>
+        <ul>
+          {% for build in current_repo.sorted_builds %}
+            <li><a href="{% url "build" current_repo.name build.number %}">Build #{{ build.number }} {{ build.result_display }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+{% endblock %}

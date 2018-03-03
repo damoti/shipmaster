@@ -1,0 +1,4 @@
+-r base.pip
+django-bootstrap-components
+django-dartium
+-e .

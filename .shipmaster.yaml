@@ -1,0 +1,28 @@
+name: shipmaster
+
+layers:
+  base:
+    from: damoti/base:latest
+    context:
+      - requirements/base.pip
+    build:
+      - pip3 install -r requirements/base.pip
+  app:
+    context:
+      - .
+    build:
+      - pip3 install -r requirements/app.pip
+      - cd shipmaster/dart && pub get && pub build
+      - cd /app
+      - export DJANGO_SETTINGS_MODULE=shipmaster.server.settings
+      - python3 manage.py collectstatic --noinput
+    prepare: fab prepare:service={service},branch={git-branch}
+    start: fab uwsgi
+    wait-for: db:5432
+  test:
+    start: fab test
+    wait-for: db:5432
+
+build:
+  branches:
+    - master

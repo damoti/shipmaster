@@ -4,3 +4,13 @@ dist/
 build/
 __pycache__
 shipmaster.egg-info
+
+static/
+docker-compose.override.yml
+shipmaster.egg-info
+shipmaster/db.sqlite3
+shipmaster/dart/.pub/
+shipmaster/dart/.packages
+shipmaster/dart/packages/
+shipmaster/dart/web/packages
+shipmaster/dart/pubspec.lock

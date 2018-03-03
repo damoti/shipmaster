@@ -1,0 +1,16 @@
+version: '2'
+services:
+  shipmaster:
+    build: ../shipmaster-server
+    image: damoti/shipmaster
+    environment:
+      DEBUG: Aye
+      GITHUB_ORG: ''
+      OAUTH_KEY: ''
+      OAUTH_SECRET: ''
+      WEBHOOK_SECRET: ''
+    ports:
+      - "8000:8000"
+    volumes:
+      - /var/lib/shipmaster:/var/lib/shipmaster
+      - /var/run/docker.sock:/var/run/docker.sock
